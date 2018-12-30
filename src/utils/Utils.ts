@@ -129,7 +129,7 @@ module rigger.utils{
         /**
          * 是否是数组
          */
-        public static isArray(arr:any):arr is []
+        public static isArray(arr:any):arr is Array<any>
         {
             return arr instanceof Array;
         }

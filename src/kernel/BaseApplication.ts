@@ -107,7 +107,6 @@ module rigger{
 				}
 			}
 			
-
 			return false;
 		}
 
@@ -136,12 +135,10 @@ module rigger{
 						// serviceCls.serviceName = deps[i][j].fullName;
 						if(!this.startService(serviceCls, new RiggerHandler(this, this.startServiceWithConfig, [cls, ser, cb, config]))){
 							ready = false;
-						}	
+						}
 					}
-
 					// 如果同一层的依赖服务有未准备好的，则在启动完同一层的所有服务后，跳出，等同一层所有服务都启动完成后，再启动下一层的服务
-					if(!ready) return;
-									
+					if(!ready) return;			
 				}
 			}
 			
@@ -254,19 +251,23 @@ module rigger{
 			// 构造核心服务配置
 			let kernelConfig:rigger.config.ServiceConfig = new rigger.config.ServiceConfig();
 
+			// 配置服务
 			let depService1:rigger.config.DependentComponentInfo = new rigger.config.DependentComponentInfo();
 			depService1.fullName = rigger.service.ConfigService.serviceName;
 
+			// 对象池服务
 			let depService2:rigger.config.DependentComponentInfo = new rigger.config.DependentComponentInfo();
 			depService2.fullName = rigger.service.PoolService.serviceName;			
 
+			// 事件服务
 			let depService3:rigger.config.DependentComponentInfo = new rigger.config.DependentComponentInfo();
 			depService3.fullName = rigger.service.EventService.serviceName;		
 
 			// 先启动配置服务,再启动其它依赖服务
 			kernelConfig.services = [[depService1], [depService2, depService3]];
 
-			this.startService(this.makeServiceClass(rigger.service.KernelService.serviceName), new RiggerHandler(this, this.onKernelServiceReady, [cb]), kernelConfig);
+			this.startService(this.makeServiceClass(rigger.service.KernelService.serviceName), 
+				new RiggerHandler(this, this.onKernelServiceReady, [cb]), kernelConfig);
 		}
 
 		/**
