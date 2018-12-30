@@ -56,14 +56,24 @@ var RiggerUtils = {
         return false;
     },
 
-    findIndex:function(arr, fun){
-        for(var i = 0; i < arr.length; ++i){
-            if(fun(arr, arr[i])){
+    findIndex: function (arr, fun) {
+        for (var i = 0; i < arr.length; ++i) {
+            if (fun(arr, arr[i])) {
                 return i;
             }
         }
 
         return -1;
+    },
+
+    filterComments: function (str) {
+        return str.replace(/(?:^|\n|\r)\s*\/\*[\s\S]*?\*\/\s*(?:\r|\n|$)/g, '\n').replace(/(?:^|\n|\r)\s*\/\/.*(?:\r|\n|$)/g, '\n')
+    },
+
+    filterCommentsInFile: function (file) {
+        var result = file.contents.toString();
+        result = RiggerUtils.filterComments(result);
+        file.contents = new Buffer(result);
     }
 }
 
@@ -77,8 +87,10 @@ module.exports = {
     removeCommentsInJson: RiggerUtils.removeCommentsInJson,
 
     createTSProject: RiggerUtils.createTSProject,
-    createTSProject1:RiggerUtils.createTSProject1,
+    createTSProject1: RiggerUtils.createTSProject1,
     readJson: RiggerUtils.readJson,
     startWith: RiggerUtils.startWith,
-    findIndex:RiggerUtils.findIndex
+    findIndex: RiggerUtils.findIndex,
+    filterComments: RiggerUtils.filterComments,
+    filterCommentsInFile: RiggerUtils.filterCommentsInFile
 }

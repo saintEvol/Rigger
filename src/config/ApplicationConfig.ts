@@ -4,7 +4,7 @@
 module rigger.config{
 	export class ApplicationConfig{
 		/**
-		 * 工程类型
+		 * 工程类型,可用类型：rigger, serice, plugin, application
 		 */
 		projectType:string;
 
