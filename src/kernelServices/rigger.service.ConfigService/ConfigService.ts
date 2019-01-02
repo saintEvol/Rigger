@@ -188,11 +188,13 @@ module rigger.service{
 			this.getApplicationConfig(new RiggerHandler(this, this.doStart, [resultHandler, serviceConfig, startupArgs]));
 		}
 
-		private makeApplicationConfigUrl():string{
+		@rigger.utils.DecoratorUtil.makeExtendable(true)
+		protected makeApplicationConfigUrl():string{
 			return `rigger/riggerConfigs/RiggerConfig.json?${Math.random()}`;
 		}
 
-		private makeServiceConfigUrl(serviceName:string):string{
+		@rigger.utils.DecoratorUtil.makeExtendable(true)
+		protected makeServiceConfigUrl(serviceName:string):string{
 			if(rigger.utils.Utils.isNullOrUndefined(serviceName) || rigger.utils.Utils.isNullOrEmpty(serviceName)){
 				return null;
 			}
