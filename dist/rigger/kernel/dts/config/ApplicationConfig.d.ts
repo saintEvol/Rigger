@@ -28,6 +28,10 @@ declare module rigger.config {
          */
         binRoot: string;
         /**
+         * 配置的构建目录，如果未设置或为空字串，则同binRoot
+         */
+        configBuildRoot: string;
+        /**
          * 自定义的服务(非第三方服务，而是本地服务)根目录
          */
         customServicesRoot: string[];

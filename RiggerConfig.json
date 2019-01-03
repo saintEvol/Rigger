@@ -23,6 +23,11 @@
 	*/
 	"binRoot": "./bin",
 
+	/**
+	* 构建项目时，配置的构建目录
+	*/
+	"configBuildRoot": "",
+
 	// 自定义服务的根路径
 	"customServicesRoot":[],
 

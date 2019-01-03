@@ -27,6 +27,10 @@ var rigger;
                  * 构建项目时，服务执行文件的目标位置,构建项目时会将相关配置复制到此目录下
                  */
                 this.binRoot = "./bin";
+                /**
+                 * 配置的构建目录，如果未设置或为空字串，则同binRoot
+                 */
+                this.configBuildRoot = "";
             }
             return ApplicationConfig;
         }());

@@ -34,6 +34,11 @@ module rigger.config{
 		public binRoot:string = "./bin";
 
 		/**
+		 * 配置的构建目录，如果未设置或为空字串，则同binRoot
+		 */
+		public configBuildRoot:string = "";
+
+		/**
 		 * 自定义的服务(非第三方服务，而是本地服务)根目录
 		 */
 		public customServicesRoot:string[];

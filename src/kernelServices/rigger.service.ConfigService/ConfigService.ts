@@ -149,7 +149,7 @@ module rigger.service{
 
 		private applicationConfig:config.ApplicationConfig;
 		private applicationConfigHandlers:RiggerHandler[] = [];
-		private applicationConfigUrl:string;
+		// private applicationConfigUrl:string;
 		private onApplicationConfigLoad(data:string){
 			this.applicationConfig = JSON.parse(utils.Utils.filterCommentsInJson(data));
 			for(var i:number = 0; i  < this.applicationConfigHandlers.length; ++i){

@@ -32,15 +32,43 @@ var RiggerBuildUitls = {
 
     buildRiggerConfigFile: function () {
         if (!fs.existsSync(Rigger.configPath)) throw new Error(`build rigger config failed:can not find ${Rigger.configPath}`);
-        var binRoot = Rigger.applicationConfig.binRoot;
-        if (!binRoot || binRoot.length <= 0) return;
+        var riggerConfigPath = RiggerBuildUitls.makeRiggerConfigBuildPath();
 
         return gulp.src(Rigger.configPath)
         .pipe(through.obj(function(file, encode, cb){
                     RiggerUtils.filterCommentsInFile(file);
                     this.push(file);
                     cb();
-                })).pipe(gulp.dest(`${binRoot}/rigger/riggerConfigs`));
+                })).pipe(gulp.dest(riggerConfigPath));
+    },
+
+    /**
+     * 生成RiggerConfig的构建路径
+     */
+    makeRiggerConfigBuildPath: function(){
+        configBuildRoot = RiggerBuildUitls.getConfigBuildPath();        
+        return `${configBuildRoot}/rigger/riggerConfigs`
+    },
+
+    /**
+     * 生成各服务的配置构建路径
+     */
+    makeServiceConfigBuildPath: function(){
+        configBuildRoot = RiggerBuildUitls.getConfigBuildPath();
+        return `${configBuildRoot}/rigger/riggerConfigs/serviceConfigs`
+    },
+
+    getConfigBuildPath: function(){
+        var configBuildRoot = Rigger.applicationConfig.configBuildRoot
+        if(!configBuildRoot || configBuildRoot == "")
+            configBuildRoot = Rigger.applicationConfig.binRoot;
+
+        if(!configBuildRoot || configBuildRoot.length <= 0) return "./build"
+        if(configBuildRoot[configBuildRoot.length - 1] == "/"){
+            configBuildRoot = configBuildRoot.slice(-2)
+        }
+
+        return configBuildRoot
     },
 
     /**
@@ -63,6 +91,7 @@ var RiggerBuildUitls = {
         var pkgRoot = `./rigger/thirdPackages`;
         if(fs.existsSync(pkgRoot)){
             var dirs = fs.readdirSync(pkgRoot);
+            serviceConfigBuildPath = RiggerBuildUitls.makeServiceConfigBuildPath();
             for (var i = 0; i < dirs.length; ++i) {
                 var dir = dirs[i];
                 // console.log("config dir:" + Rigger.makeThirdServiceConfigPath(dir));
@@ -78,7 +107,7 @@ var RiggerBuildUitls = {
                         this.push(file);
                         cb();
                     }))
-                    .pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
+                    .pipe(gulp.dest(serviceConfigBuildPath));
                 }
                 else if(!fs.existsSync(connectbinRoot) && fs.existsSync(mainLogicbinRoot)) {
                     gulp.src(`${pkgRoot}/${dir}/customServiceConfigs/rigger.service.ConnectService.json`)
@@ -86,7 +115,7 @@ var RiggerBuildUitls = {
                         RiggerUtils.filterCommentsInFile(file);
                         this.push(file);
                         cb();
-                    })).pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
+                    })).pipe(gulp.dest(serviceConfigBuildPath));
                 }
                 else {
                     gulp.src(`${pkgRoot}/${dir}/customServiceConfigs/*.json`)
@@ -95,7 +124,7 @@ var RiggerBuildUitls = {
                         this.push(file);
                         cb();
                     }))
-                    .pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
+                    .pipe(gulp.dest(serviceConfigBuildPath));
                 }
             }
         }
@@ -110,13 +139,14 @@ var RiggerBuildUitls = {
             //     // console.log("config dir:" + Rigger.makeThirdServiceConfigPath(dir));
             //     gulp.src(Rigger.makeKennelServiceConfigPath(dir)).pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
             // }
+            var serviceBuildPath = RiggerBuildUitls.makeServiceConfigBuildPath();
             gulp.src(`${Rigger.makeKernelConfigPath("rigger.service.EventService")}/*.json`)
             .pipe(through.obj(function(file, encode, cb){
                 RiggerUtils.filterCommentsInFile(file);
                 this.push(file);
                 cb();
             }))
-            .pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
+            .pipe(gulp.dest(serviceBuildPath));
 
             gulp.src(`${Rigger.makeKernelConfigPath("rigger.service.KernelService")}/*.json`)
             .pipe(through.obj(function(file, encode, cb){
@@ -124,14 +154,14 @@ var RiggerBuildUitls = {
                 this.push(file);
                 cb();
             }))
-            .pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
+            .pipe(gulp.dest(serviceBuildPath));
 
             gulp.src(`${Rigger.makeKernelConfigPath("rigger.service.PoolService")}/*.json`).pipe(through.obj(function(file, encode, cb){
                 RiggerUtils.filterCommentsInFile(file);
                 this.push(file);
                 cb();
             }))
-            .pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
+            .pipe(gulp.dest(serviceBuildPath));
 
             // gulp.src(`${ksRoot}/dts/kernelServices/*/*.json`).pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
         }
@@ -141,6 +171,7 @@ var RiggerBuildUitls = {
         var thirdRoot = Rigger.thirdServicesRoot;
         if (fs.existsSync(thirdRoot)) {
             var dirs = fs.readdirSync(thirdRoot);
+            var serviceConfigBuildPath = RiggerBuildUitls.makeServiceConfigBuildPath();
             for (var i = 0; i < dirs.length; ++i) {
                 var dir = dirs[i];
                 // console.log("config dir:" + Rigger.makeThirdServiceConfigPath(dir));
@@ -151,7 +182,7 @@ var RiggerBuildUitls = {
                     this.push(file);
                     cb();
                 }))
-            .pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
+            .pipe(gulp.dest(serviceConfigBuildPath));
             }
         }
 
@@ -257,6 +288,7 @@ var RiggerBuildUitls = {
         if (!binRoot || binRoot.length <= 0) return;
 
         var configFilePath;
+        var serviceConfigBuildPath = RiggerBuildUitls.makeServiceConfigBuildPath();
         for (var index = 0; index < dirs.length; index++) {
             var dir = dirs[index];
             // console.log(`dir:${dir}`);
@@ -267,7 +299,7 @@ var RiggerBuildUitls = {
                 this.push(file);
                 cb();
             }))
-            .pipe(gulp.dest(`${binRoot}/rigger/riggerConfigs/serviceConfigs`));
+            .pipe(gulp.dest(serviceConfigBuildPath));
         }
     },
 
