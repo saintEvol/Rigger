@@ -1892,6 +1892,7 @@ var rigger;
                     cbs[i].runWith([configInfo.data]);
                 }
             };
+            // private applicationConfigUrl:string;
             ConfigService.prototype.onApplicationConfigLoad = function (data) {
                 this.applicationConfig = JSON.parse(rigger.utils.Utils.filterCommentsInJson(data));
                 for (var i = 0; i < this.applicationConfigHandlers.length; ++i) {

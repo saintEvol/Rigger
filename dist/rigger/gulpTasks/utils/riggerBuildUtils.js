@@ -10,29 +10,29 @@ var through = require("through2")
 var Rigger = require('./rigger.js');
 var RiggerUtils = require('./riggerUtils.js')
 
-var RiggerBuildUitls = {
+var RiggerBuildUtils = {
     reConfig: function () {
         Rigger.init();
-        if (!RiggerBuildUitls.checkBuild()) return;
-        RiggerBuildUitls.buildConfigs();
+        if (!RiggerBuildUtils.checkBuild()) return;
+        RiggerBuildUtils.buildConfigs();
     },
 
     build: function () {
         Rigger.init();
-        if (!RiggerBuildUitls.checkBuild()) return;
-        RiggerBuildUitls.buildConfigs();
-        RiggerBuildUitls.buildBin();
+        if (!RiggerBuildUtils.checkBuild()) return;
+        RiggerBuildUtils.buildConfigs();
+        RiggerBuildUtils.buildBin();
     },
 
     buildConfigs: function () {
         // 初始化Rigger配置
-        RiggerBuildUitls.buildRiggerConfigFile();
-        RiggerBuildUitls.buildServiceConfigFiles();
+        RiggerBuildUtils.buildRiggerConfigFile();
+        RiggerBuildUtils.buildServiceConfigFiles();
     },
 
     buildRiggerConfigFile: function () {
         if (!fs.existsSync(Rigger.configPath)) throw new Error(`build rigger config failed:can not find ${Rigger.configPath}`);
-        var riggerConfigPath = makeRiggerConfigBuildPath();
+        var riggerConfigPath = RiggerBuildUtils.makeRiggerConfigBuildPath();
 
         return gulp.src(Rigger.configPath)
         .pipe(through.obj(function(file, encode, cb){
@@ -46,7 +46,7 @@ var RiggerBuildUitls = {
      * 生成RiggerConfig的构建路径
      */
     makeRiggerConfigBuildPath: function(){
-        configBuildRoot = RiggerBuildUitls.getConfigBuildPath();        
+        configBuildRoot = RiggerBuildUtils.getConfigBuildPath();        
         return `${configBuildRoot}/rigger/riggerConfigs`
     },
 
@@ -54,7 +54,7 @@ var RiggerBuildUitls = {
      * 生成各服务的配置构建路径
      */
     makeServiceConfigBuildPath: function(){
-        configBuildRoot = RiggerBuildUitls.getConfigBuildPath();
+        configBuildRoot = RiggerBuildUtils.getConfigBuildPath();
         return `${configBuildRoot}/rigger/riggerConfigs/serviceConfigs`
     },
 
@@ -81,17 +81,17 @@ var RiggerBuildUitls = {
     },
 
     buildServiceConfigFiles: function () {
-        RiggerBuildUitls.buildKernelServiceConfigFiles();        
-        RiggerBuildUitls.buildThirdServiceConfigFiles();
-        RiggerBuildUitls.buildCustomServiceConfigFiles();
-        RiggerBuildUitls.buildPackageConfigFiles();
+        RiggerBuildUtils.buildKernelServiceConfigFiles();        
+        RiggerBuildUtils.buildThirdServiceConfigFiles();
+        RiggerBuildUtils.buildCustomServiceConfigFiles();
+        RiggerBuildUtils.buildPackageConfigFiles();
     },
 
     buildPackageConfigFiles:function(){
         var pkgRoot = `./rigger/thirdPackages`;
         if(fs.existsSync(pkgRoot)){
             var dirs = fs.readdirSync(pkgRoot);
-            serviceConfigBuildPath = RiggerBuildUitls.makeServiceConfigBuildPath();
+            serviceConfigBuildPath = RiggerBuildUtils.makeServiceConfigBuildPath();
             for (var i = 0; i < dirs.length; ++i) {
                 var dir = dirs[i];
                 // console.log("config dir:" + Rigger.makeThirdServiceConfigPath(dir));
@@ -139,7 +139,7 @@ var RiggerBuildUitls = {
             //     // console.log("config dir:" + Rigger.makeThirdServiceConfigPath(dir));
             //     gulp.src(Rigger.makeKennelServiceConfigPath(dir)).pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
             // }
-            var serviceBuildPath = RiggerBuildUitls.makeServiceConfigBuildPath();
+            var serviceBuildPath = RiggerBuildUtils.makeServiceConfigBuildPath();
             gulp.src(`${Rigger.makeKernelConfigPath("rigger.service.EventService")}/*.json`)
             .pipe(through.obj(function(file, encode, cb){
                 RiggerUtils.filterCommentsInFile(file);
@@ -171,7 +171,7 @@ var RiggerBuildUitls = {
         var thirdRoot = Rigger.thirdServicesRoot;
         if (fs.existsSync(thirdRoot)) {
             var dirs = fs.readdirSync(thirdRoot);
-            var serviceConfigBuildPath = RiggerBuildUitls.makeServiceConfigBuildPath();
+            var serviceConfigBuildPath = RiggerBuildUtils.makeServiceConfigBuildPath();
             for (var i = 0; i < dirs.length; ++i) {
                 var dir = dirs[i];
                 // console.log("config dir:" + Rigger.makeThirdServiceConfigPath(dir));
@@ -196,7 +196,7 @@ var RiggerBuildUitls = {
         if (!root || root.length <= 0) return;
         for (var i = 0; i < root.length; i++) {
             var element = root[i];
-            RiggerBuildUitls.doBuildServiceConfigFiles(element, Rigger.applicationConfig.binRoot);
+            RiggerBuildUtils.doBuildServiceConfigFiles(element, Rigger.applicationConfig.binRoot);
         }
     },
 
@@ -206,9 +206,9 @@ var RiggerBuildUitls = {
         var src = [];
         src.push(`./rigger/kernel/bin/rigger.js`);
         // var riggerBin = gulp.src(`./rigger/kernel/bin/rigger.js`);
-        RiggerBuildUitls.collectServicesSrc(src);
+        RiggerBuildUtils.collectServicesSrc(src);
         src.push(`./rigger/thirdPlugins/**/bin/*.js`);
-        RiggerBuildUitls.collectPackagesSrc(src);
+        RiggerBuildUtils.collectPackagesSrc(src);
         // var pluginsBin = gulp.src(`./rigger/thirdPlugins/**/*.js`);
         return gulp.src(src).pipe(concat("rigger.min.js")).pipe(gulp.dest(`${binRoot}/rigger`));
         // .pipe(gulp.dest(`${binRoot}/rigger`));
@@ -227,7 +227,7 @@ var RiggerBuildUitls = {
             var sers = depServices[i];
             for (var j = 0; j < sers.length; j++) {
                 var ser = sers[j];
-                RiggerBuildUitls.collectSingleServiceSrc(ser.fullName, handledServicesMap, initSrc);
+                RiggerBuildUtils.collectSingleServiceSrc(ser.fullName, handledServicesMap, initSrc);
             }
         }
 
@@ -265,7 +265,7 @@ var RiggerBuildUitls = {
                     var sers = depServices[i];
                     for (var j = 0; j < sers.length; j++) {
                         var ser = sers[j];
-                        RiggerBuildUitls.collectSingleServiceSrc(ser.fullName, builtMap, src);
+                        RiggerBuildUtils.collectSingleServiceSrc(ser.fullName, builtMap, src);
 
                     }
                 }
@@ -288,7 +288,7 @@ var RiggerBuildUitls = {
         if (!binRoot || binRoot.length <= 0) return;
 
         var configFilePath;
-        var serviceConfigBuildPath = RiggerBuildUitls.makeServiceConfigBuildPath();
+        var serviceConfigBuildPath = RiggerBuildUtils.makeServiceConfigBuildPath();
         for (var index = 0; index < dirs.length; index++) {
             var dir = dirs[index];
             // console.log(`dir:${dir}`);
@@ -315,8 +315,8 @@ var RiggerBuildUitls = {
 };
 
 module.exports = {
-    build: RiggerBuildUitls.build,
-    buildConfigs: RiggerBuildUitls.buildConfigs,
-    initRiggerConfigFile: RiggerBuildUitls.initRiggerConfigFile,
-    reConfig: RiggerBuildUitls.reConfig,
+    build: RiggerBuildUtils.build,
+    buildConfigs: RiggerBuildUtils.buildConfigs,
+    initRiggerConfigFile: RiggerBuildUtils.initRiggerConfigFile,
+    reConfig: RiggerBuildUtils.reConfig,
 }

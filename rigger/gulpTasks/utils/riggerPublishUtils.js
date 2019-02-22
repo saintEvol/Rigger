@@ -54,7 +54,8 @@ var RiggerPublishUtils = {
         if (!appConfig) Rigger.init();
         var srcRoot = appConfig.srcRoot;
         var dirs = fs.readdirSync(srcRoot);
-        let riggerStream = gulp.src("./rigger/kernel/**/*.ts");
+        let riggerStream = gulp.src(["./rigger/kernel/**/*.ts", "./rigger/thirdServices/**/*.ts"]);
+
         var servicePath;
         for (var index = 0; index < dirs.length; index++) {
             var dir = dirs[index];

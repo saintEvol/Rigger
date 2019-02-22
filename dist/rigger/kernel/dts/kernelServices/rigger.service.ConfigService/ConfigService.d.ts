@@ -82,7 +82,6 @@ declare module rigger.service {
         protected abstract loadConfig(url: string, caller: any, method: Function, args?: any): void;
         private applicationConfig;
         private applicationConfigHandlers;
-        private applicationConfigUrl;
         private onApplicationConfigLoad;
         protected onApplicationConfigInit(startCb: RiggerHandler): void;
         private getServiceConfigInfo;
