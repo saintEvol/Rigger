@@ -9,6 +9,11 @@ module rigger.config{
 		public fullName:string;
 
 		/**
+		 * 描述文字
+		 */
+		public desc:string;
+
+		/**
 		 * 版本
 		 */
 		public version:string;

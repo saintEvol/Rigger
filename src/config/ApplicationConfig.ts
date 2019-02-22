@@ -20,6 +20,8 @@ module rigger.config{
 
 		/**
 		 * 库路径
+		 * gulp 会读取此路径中的源文件，所以应写成如下形式:
+		 * ["./libs/*.ts"]
 		 */
 		public libPathes:string[] = [];
 

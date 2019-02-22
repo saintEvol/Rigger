@@ -8,6 +8,10 @@ declare module rigger.config {
          */
         fullName: string;
         /**
+         * 描述文字
+         */
+        desc: string;
+        /**
          * 版本
          */
         version: string;

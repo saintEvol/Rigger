@@ -12,6 +12,10 @@
 	*/
 	"srcRoot": "./src",
 
+	/**
+	*	库路径，因为GULP会读取此字段中配置的流，所以形式应如：
+	* 	libPathes:["./libs/*.ts"]
+	*/
 	"libPathes":[],
 
 	/**
