@@ -74,6 +74,7 @@ var RiggerUpdateUitls = {
         if(!Rigger.applicationConfig) Rigger.init();
         var config = RiggerUtils.readJson(Rigger.configPath);
         var group = config.plugins;
+        if(!group) return;
         for(var i=0; i<group.length; i++) {
             var plugin = group[i];
             RiggerUpdateUitls.updateSinglePlugin(plugin);
