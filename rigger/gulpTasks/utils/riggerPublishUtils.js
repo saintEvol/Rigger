@@ -100,6 +100,8 @@ var RiggerPublishUtils = {
             gulp.src([`${pluginRoot}/**/*.ts`])
                 .pipe(sorter(false))).pipe(tsProject());
         var outRoot = Rigger.applicationConfig.outRoot;
+        /// 发布配置文件
+        gulp.src(`${pluginRoot}/config/*.json`).pipe(gulp.dest(`${outRoot}/thirdPlugins/${pluginName}/dts/config`));
         tsResult.dts.pipe(gulp.dest(`${outRoot}/thirdPlugins/${pluginName}/dts`));
         tsResult.js.pipe(concat(`${pluginName}.min.js`)).pipe(gulp.dest(`${outRoot}/thirdPlugins/${pluginName}/bin`));
 
