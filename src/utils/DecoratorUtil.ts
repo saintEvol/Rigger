@@ -10,8 +10,15 @@ module rigger.utils {
         /**
          * 反向映射装饰器,即以字段的值为键，以字段的键为值建立一个新的字段，只推荐常量用
          */
-        public static retrievAble(v?: number) {
-            return function (target: any, keyStr: string) {
+        public static retrievAble(v?: number) :(target: any, keyStr: string) => void{
+            return DecoratorUtil.retrievAble(v);
+        }
+
+        /**
+         * 反向映射装饰器,即以字段的值为键，以字段的键为值建立一个新的字段，只推荐常量用
+         */
+        public static retrievable(v?: number){
+             return function (target: any, keyStr: string) {
                 // console.log(`key str:${keyStr}, v:${v}`);
                 v = v || target[keyStr];
                 target[v] = keyStr;
