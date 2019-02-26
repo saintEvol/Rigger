@@ -5,17 +5,12 @@ declare module rigger.config {
     /**
      * 服务配置
      */
-    class ServiceConfig {
+    class ServiceConfig extends DependentComponentInfo {
         constructor();
-        /**
-         * 服务的全名
-         */
-        fullName: string;
-        version: string;
         /**
          * 依赖的服务信息
          */
-        services: config.DependentComponentInfo[][];
+        services: config.ServiceConfig[];
         /**
          * 依赖的插件信息
          */

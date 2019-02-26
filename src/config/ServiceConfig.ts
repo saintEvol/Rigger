@@ -11,23 +11,15 @@ module rigger.config{
 	/**
 	 * 服务配置
 	 */
-	export class ServiceConfig{
+	export class ServiceConfig extends DependentComponentInfo{
 		constructor(){
-
+			super();
 		}
-
-		/**
-		 * 服务的全名
-		 */
-		public fullName:string = "";
-
-		// 版本
-		public version:string;
 
 		/**
 		 * 依赖的服务信息
 		 */
-		public services:config.DependentComponentInfo[][];
+		public services:config.ServiceConfig[];
 
 		/**
 		 * 依赖的插件信息

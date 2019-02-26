@@ -40,7 +40,7 @@ declare module rigger.config {
         /**
          * 应用需要启动的服务
          */
-        services: DependentComponentInfo[][];
+        services: ServiceConfig[][];
         /**
          * 应用依赖的包
          */

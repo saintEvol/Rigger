@@ -27,7 +27,8 @@ var RiggerBuildUtils = {
     buildConfigs: function () {
         // 初始化Rigger配置
         RiggerBuildUtils.buildRiggerConfigFile();
-        RiggerBuildUtils.buildServiceConfigFiles();
+        // 将服务配置迁移到RiggerConfig中去了，不再零散的配置到各服务中
+        // RiggerBuildUtils.buildServiceConfigFiles();
     },
 
     buildRiggerConfigFile: function () {

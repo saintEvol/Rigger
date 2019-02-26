@@ -11,15 +11,10 @@ declare module rigger.service {
         /**
          * 配置获取成功后需要回调的句柄列表
          */
-        handlers: RiggerHandler[];
         /**
          * 配置资源，如果加载成功，该字段会被初始化
          */
         data: config.ServiceConfig;
-        /**
-         * 配置文件的URL地址
-         */
-        url: string;
     }
     enum ConfigStaus {
         None = 1,
@@ -69,23 +64,28 @@ declare module rigger.service {
         /**
          * 获取服务配置
          * @param serviceName
-         * @param cb
          */
-        getServiceConfig(serviceName: string, cb: RiggerHandler): any;
-        protected loadServiceConfig(serviceName: string): void;
+        getServiceConfig(serviceName: string): config.ServiceConfig;
         /**
          * 服务配置加载完成
          * @param serviceName
          * @param data
          */
-        protected onServiceConfigLoad(serviceName: string, data: string): void;
+        /**
+         * 加载配置
+         * @param url 应用的配置的路径，此路径相对于bin目录
+         * @param caller 加载完成后的回调域
+         * @param method 加载完成后的回调方法
+         * @param args 加载完成后的回调参数
+         */
         protected abstract loadConfig(url: string, caller: any, method: Function, args?: any): void;
+        protected onApplicationConfigInit(startCb: RiggerHandler): void;
         private applicationConfig;
         private applicationConfigHandlers;
         private onApplicationConfigLoad;
-        protected onApplicationConfigInit(startCb: RiggerHandler): void;
+        private treateApplicationConfig;
+        private initServiceConfigs;
         private getServiceConfigInfo;
-        private setServiceConfigInfo;
         /**
          * 初始化应用的配置
          * @param resultHandler
@@ -93,8 +93,12 @@ declare module rigger.service {
          * @param startupArgs
          */
         private initApplicationConfig;
+        /**
+         * @plugin rigger.utils.DecoratorUtil.makeExtendable(true)
+         * 生成应用的配置的路径
+         *
+        */
         protected makeApplicationConfigUrl(): string;
-        protected makeServiceConfigUrl(serviceName: string): string;
         private doStart;
     }
 }

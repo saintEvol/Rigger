@@ -48,7 +48,7 @@ module rigger.config{
 		/**
 		 * 应用需要启动的服务
 		 */
-		public services:DependentComponentInfo[][];
+		public services:ServiceConfig[][];
 
 		/**
 		 * 应用依赖的包

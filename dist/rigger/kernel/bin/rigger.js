@@ -78,6 +78,16 @@ var rigger;
     })(config = rigger.config || (rigger.config = {}));
 })(rigger || (rigger = {}));
 
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
 /**
 * name
 */
@@ -93,15 +103,13 @@ var rigger;
         /**
          * 服务配置
          */
-        var ServiceConfig = /** @class */ (function () {
+        var ServiceConfig = /** @class */ (function (_super) {
+            __extends(ServiceConfig, _super);
             function ServiceConfig() {
-                /**
-                 * 服务的全名
-                 */
-                this.fullName = "";
+                return _super.call(this) || this;
             }
             return ServiceConfig;
-        }());
+        }(config.DependentComponentInfo));
         config.ServiceConfig = ServiceConfig;
     })(config = rigger.config || (rigger.config = {}));
 })(rigger || (rigger = {}));
@@ -578,7 +586,15 @@ var rigger;
                 // 获取配置,为启动服务作准备
                 var configService = this.getRunningService(rigger.service.ConfigService.serviceName);
                 if (configService) {
-                    configService.getServiceConfig(serviceName, new rigger.RiggerHandler(this, this.startServiceWithConfig, [serviceCls, service, cb]));
+                    var serConfig = configService.getServiceConfig(serviceName);
+                    this.startServiceWithConfig(serviceCls, service, cb, serConfig);
+                    // if(serConfig){
+                    // 	this.startServiceWithConfig(serviceCls, service, cb, serConfig);
+                    // }
+                    // else{
+                    // 	throw new Error(`Can Not Get Service Config for ${serviceName}`);
+                    // }
+                    // configService.getServiceConfig(serviceName, new RiggerHandler(this, this.startServiceWithConfig, [serviceCls, service, cb]));
                 }
                 // 配置服务特殊处理
                 else if (serviceName === rigger.service.ConfigService.serviceName || serviceName === this.newConfigServiceName) {
@@ -606,19 +622,12 @@ var rigger;
                 }
             }
             var deps = config ? config.services : [];
-            var ready = true;
             if (deps && deps.length > 0) {
                 for (var i = 0; i < deps.length; ++i) {
-                    for (var j = 0; j < deps[i].length; ++j) {
-                        var serviceCls = this.makeServiceClass(deps[i][j].fullName);
-                        // serviceCls.serviceName = deps[i][j].fullName;
-                        if (!this.startService(serviceCls, new rigger.RiggerHandler(this, this.startServiceWithConfig, [cls, ser, cb, config]))) {
-                            ready = false;
-                        }
-                    }
-                    // 如果同一层的依赖服务有未准备好的，则在启动完同一层的所有服务后，跳出，等同一层所有服务都启动完成后，再启动下一层的服务
-                    if (!ready)
+                    var serviceCls = this.makeServiceClass(deps[i].fullName);
+                    if (!this.startService(serviceCls, new rigger.RiggerHandler(this, this.startServiceWithConfig, [cls, ser, cb, config]))) {
                         return;
+                    }
                 }
             }
             // 准备好了，直接启动
@@ -722,16 +731,16 @@ var rigger;
             // 构造核心服务配置
             var kernelConfig = new rigger.config.ServiceConfig();
             // 配置服务
-            var depService1 = new rigger.config.DependentComponentInfo();
+            var depService1 = new rigger.config.ServiceConfig();
             depService1.fullName = rigger.service.ConfigService.serviceName;
             // 对象池服务
-            var depService2 = new rigger.config.DependentComponentInfo();
+            var depService2 = new rigger.config.ServiceConfig();
             depService2.fullName = rigger.service.PoolService.serviceName;
             // 事件服务
-            var depService3 = new rigger.config.DependentComponentInfo();
+            var depService3 = new rigger.config.ServiceConfig();
             depService3.fullName = rigger.service.EventService.serviceName;
             // 先启动配置服务,再启动其它依赖服务
-            kernelConfig.services = [[depService1], [depService2, depService3]];
+            kernelConfig.services = [depService1, depService2, depService3];
             this.startService(this.makeServiceClass(rigger.service.KernelService.serviceName), new rigger.RiggerHandler(this, this.onKernelServiceReady, [cb]), kernelConfig);
         };
         /**
@@ -1272,6 +1281,11 @@ var rigger;
     })(utils = rigger.utils || (rigger.utils = {}));
 })(rigger || (rigger = {}));
 
+
+
+
+
+
 /**
 * 有限状态机类
 */
@@ -1753,11 +1767,6 @@ var rigger;
     rigger.FSMUtils = FSMUtils;
 })(rigger || (rigger = {}));
 
-
-
-
-
-
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
         ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
@@ -1787,9 +1796,9 @@ var rigger;
         var ConfigInfo = /** @class */ (function () {
             function ConfigInfo() {
                 this.status = ConfigStaus.None;
-                this.handlers = [];
+                // this.handlers = [];
                 this.data = null;
-                this.url = null;
+                // this.url = null;
             }
             return ConfigInfo;
         }());
@@ -1866,51 +1875,46 @@ var rigger;
             /**
              * 获取服务配置
              * @param serviceName
-             * @param cb
              */
-            ConfigService.prototype.getServiceConfig = function (serviceName, cb) {
+            ConfigService.prototype.getServiceConfig = function (serviceName) {
                 var configInfo = this.getServiceConfigInfo(serviceName);
                 if (configInfo && configInfo.status === ConfigStaus.Ready)
-                    return cb.runWith([configInfo.data]);
-                configInfo.handlers.push(cb);
-                // 还没加载，加载一下
-                if (configInfo.status !== ConfigStaus.Loading) {
-                    configInfo.status = ConfigStaus.Loading;
-                    this.loadServiceConfig(serviceName);
-                }
-            };
-            ConfigService.prototype.loadServiceConfig = function (serviceName) {
-                this.loadConfig(this.makeServiceConfigUrl(serviceName), this, this.onServiceConfigLoad, [serviceName]);
-            };
-            /**
-             * 服务配置加载完成
-             * @param serviceName
-             * @param data
-             */
-            ConfigService.prototype.onServiceConfigLoad = function (serviceName, data) {
-                data = rigger.utils.Utils.filterCommentsInJson(data);
-                var configInfo = this.getServiceConfigInfo(serviceName);
-                configInfo.data = rigger.utils.Utils.isNullOrEmpty(data) ? new rigger.config.ServiceConfig() : JSON.parse(data);
-                configInfo.status = ConfigStaus.Ready;
-                var cbs = configInfo.handlers;
-                if (!cbs)
-                    return;
-                configInfo.handlers = [];
-                for (var i = 0; i < cbs.length; ++i) {
-                    cbs[i].runWith([configInfo.data]);
-                }
-            };
-            // private applicationConfigUrl:string;
-            ConfigService.prototype.onApplicationConfigLoad = function (data) {
-                this.applicationConfig = JSON.parse(rigger.utils.Utils.filterCommentsInJson(data));
-                for (var i = 0; i < this.applicationConfigHandlers.length; ++i) {
-                    this.applicationConfigHandlers[i].runWith([this.applicationConfig]);
-                }
-                this.applicationConfigHandlers = [];
+                    return configInfo.data;
+                return null;
             };
             ConfigService.prototype.onApplicationConfigInit = function (startCb) {
                 console.log("App Config Inited");
                 startCb.success();
+            };
+            // private applicationConfigUrl:string;
+            ConfigService.prototype.onApplicationConfigLoad = function (data) {
+                this.applicationConfig = JSON.parse(rigger.utils.Utils.filterCommentsInJson(data));
+                // 处理应用配置
+                this.treateApplicationConfig();
+                // 回调
+                for (var i = 0; i < this.applicationConfigHandlers.length; ++i) {
+                    this.applicationConfigHandlers[i].runWith([this.applicationConfig]);
+                }
+                // 清除回调
+                this.applicationConfigHandlers = [];
+            };
+            ConfigService.prototype.treateApplicationConfig = function () {
+                // 从应用配置中获取所有的服务配置
+                this.initServiceConfigs();
+            };
+            ConfigService.prototype.initServiceConfigs = function () {
+                if (!this._serviceConfigMap)
+                    this._serviceConfigMap = {};
+                var appConfig = this.applicationConfig;
+                var serviceArrOfArr = appConfig.services;
+                for (var i = 0; i < serviceArrOfArr.length; ++i) {
+                    for (var j = 0; j < serviceArrOfArr[i].length; ++j) {
+                        var serConfig = serviceArrOfArr[i][j];
+                        var configInfo = this.getServiceConfigInfo(serConfig.fullName);
+                        configInfo.data = serConfig;
+                        configInfo.status = ConfigStaus.Ready;
+                    }
+                }
             };
             ConfigService.prototype.getServiceConfigInfo = function (serviceName) {
                 var info = this._serviceConfigMap[serviceName];
@@ -1920,9 +1924,9 @@ var rigger;
                 }
                 return info;
             };
-            ConfigService.prototype.setServiceConfigInfo = function (serviceName, info) {
-                this._serviceConfigMap[serviceName] = info;
-            };
+            // private setServiceConfigInfo(serviceName: string, info: ConfigInfo) {
+            // 	this._serviceConfigMap[serviceName] = info;
+            // }
             /**
              * 初始化应用的配置
              * @param resultHandler
@@ -1936,18 +1940,24 @@ var rigger;
                 }
                 this.getApplicationConfig(new rigger.RiggerHandler(this, this.doStart, [resultHandler, serviceConfig, startupArgs]));
             };
+            /**
+             * @plugin rigger.utils.DecoratorUtil.makeExtendable(true)
+             * 生成应用的配置的路径
+             *
+            */
             ConfigService.prototype.makeApplicationConfigUrl = function () {
                 return "rigger/riggerConfigs/RiggerConfig.json?" + Math.random();
             };
-            ConfigService.prototype.makeServiceConfigUrl = function (serviceName) {
-                if (rigger.utils.Utils.isNullOrUndefined(serviceName) || rigger.utils.Utils.isNullOrEmpty(serviceName)) {
-                    return null;
-                }
-                // let strArr:string[] = serviceName.split(".");
-                // if(strArr.length <= 0) return null;
-                // return `rigger/riggerConfigs/serviceConfigs/${strArr[strArr.length - 1]}Config.json?${Math.random()}`;
-                return "rigger/riggerConfigs/serviceConfigs/" + serviceName + ".json?" + Math.random();
-            };
+            // @rigger.utils.DecoratorUtil.makeExtendable(true)
+            // protected makeServiceConfigUrl(serviceName: string): string {
+            // 	if (rigger.utils.Utils.isNullOrUndefined(serviceName) || rigger.utils.Utils.isNullOrEmpty(serviceName)) {
+            // 		return null;
+            // 	}
+            // 	// let strArr:string[] = serviceName.split(".");
+            // 	// if(strArr.length <= 0) return null;
+            // 	// return `rigger/riggerConfigs/serviceConfigs/${strArr[strArr.length - 1]}Config.json?${Math.random()}`;
+            // 	return `rigger/riggerConfigs/serviceConfigs/${serviceName}.json?${Math.random()}`;
+            // }
             ConfigService.prototype.doStart = function (resultHandler, serviceConfig, startupArgs, cfg) {
                 this.getApplication().setConfig(cfg);
                 _super.prototype.start.call(this, resultHandler, serviceConfig, startupArgs);
@@ -1962,15 +1972,67 @@ var rigger;
                 __metadata("design:paramtypes", []),
                 __metadata("design:returntype", String)
             ], ConfigService.prototype, "makeApplicationConfigUrl", null);
-            __decorate([
-                rigger.utils.DecoratorUtil.makeExtendable(true),
-                __metadata("design:type", Function),
-                __metadata("design:paramtypes", [String]),
-                __metadata("design:returntype", String)
-            ], ConfigService.prototype, "makeServiceConfigUrl", null);
             return ConfigService;
         }(service.AbsService));
         service.ConfigService = ConfigService;
+    })(service = rigger.service || (rigger.service = {}));
+})(rigger || (rigger = {}));
+
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+/**
+* 核心服务
+*/
+var rigger;
+(function (rigger) {
+    var service;
+    (function (service) {
+        var KernelService = /** @class */ (function (_super) {
+            __extends(KernelService, _super);
+            function KernelService() {
+                return _super.call(this) || this;
+            }
+            /**
+             * 服务启动时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             *
+             * @example resultHandler.runWith([true]) 启动成功
+             */
+            KernelService.prototype.onStart = function (resultHandler, startupArgs) {
+                resultHandler.success();
+            };
+            /**
+             * 停止服务时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 服务停用成功
+             */
+            KernelService.prototype.onStop = function (resultHandler) {
+                resultHandler.success();
+            };
+            /**
+             * 启动服务时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 重启
+             */
+            KernelService.prototype.onReStart = function (resultHandler) {
+                resultHandler.success();
+            };
+            /**
+             * 服务名
+             */
+            KernelService.serviceName = "rigger.service.KernelService";
+            return KernelService;
+        }(service.AbsService));
+        service.KernelService = KernelService;
     })(service = rigger.service || (rigger.service = {}));
 })(rigger || (rigger = {}));
 
@@ -2119,64 +2181,6 @@ var rigger;
             return EventService;
         }(service.AbsService));
         service.EventService = EventService;
-    })(service = rigger.service || (rigger.service = {}));
-})(rigger || (rigger = {}));
-
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-/**
-* 核心服务
-*/
-var rigger;
-(function (rigger) {
-    var service;
-    (function (service) {
-        var KernelService = /** @class */ (function (_super) {
-            __extends(KernelService, _super);
-            function KernelService() {
-                return _super.call(this) || this;
-            }
-            /**
-             * 服务启动时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             *
-             * @example resultHandler.runWith([true]) 启动成功
-             */
-            KernelService.prototype.onStart = function (resultHandler, startupArgs) {
-                resultHandler.success();
-            };
-            /**
-             * 停止服务时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 服务停用成功
-             */
-            KernelService.prototype.onStop = function (resultHandler) {
-                resultHandler.success();
-            };
-            /**
-             * 启动服务时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 重启
-             */
-            KernelService.prototype.onReStart = function (resultHandler) {
-                resultHandler.success();
-            };
-            /**
-             * 服务名
-             */
-            KernelService.serviceName = "rigger.service.KernelService";
-            return KernelService;
-        }(service.AbsService));
-        service.KernelService = KernelService;
     })(service = rigger.service || (rigger.service = {}));
 })(rigger || (rigger = {}));
 
