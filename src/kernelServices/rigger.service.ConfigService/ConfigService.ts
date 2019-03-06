@@ -156,8 +156,13 @@ module rigger.service {
 		private applicationConfig: config.ApplicationConfig;
 		private applicationConfigHandlers: RiggerHandler[] = [];
 		// private applicationConfigUrl:string;
-		private onApplicationConfigLoad(data: string) {
-			this.applicationConfig = JSON.parse(utils.Utils.filterCommentsInJson(data));
+		private onApplicationConfigLoad(data: string | config.ApplicationConfig) {
+			if (utils.Utils.isString(data)) {
+				this.applicationConfig = JSON.parse(utils.Utils.filterCommentsInJson(data));
+			}
+			else{
+				this.applicationConfig = data;
+			}
 
 			// 处理应用配置
 			this.treateApplicationConfig();
@@ -183,7 +188,7 @@ module rigger.service {
 			let serviceArrOfArr: config.ServiceConfig[][] = appConfig.services;
 			for (var i: number = 0; i < serviceArrOfArr.length; ++i) {
 				for (var j: number = 0; j < serviceArrOfArr[i].length; ++j) {
-					let serConfig:config.ServiceConfig = serviceArrOfArr[i][j];
+					let serConfig: config.ServiceConfig = serviceArrOfArr[i][j];
 					let configInfo: ConfigInfo = this.getServiceConfigInfo(serConfig.fullName);
 
 					configInfo.data = serConfig;

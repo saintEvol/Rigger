@@ -54,13 +54,14 @@ var RiggerPublishUtils = {
         if (!appConfig) Rigger.init();
         var srcRoot = appConfig.srcRoot;
         var dirs = fs.readdirSync(srcRoot);
-        let riggerStream = gulp.src(["./rigger/kernel/**/*.ts", "./rigger/thirdServices/**/*.ts"]);
+        // let riggerStream = gulp.src(["./rigger/kernel/**/*.ts", "./rigger/thirdServices/**/*.ts"]);
+        let commonStream = RiggerPublishUtils.collectCommonStream();
 
         var servicePath;
         for (var index = 0; index < dirs.length; index++) {
             var dir = dirs[index];
             // console.log(`dir:${dir}`);
-            RiggerPublishUtils.publishSingleService(riggerStream, srcRoot, dir)
+            RiggerPublishUtils.publishSingleService(commonStream, srcRoot, dir)
         }
     },
 

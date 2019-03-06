@@ -22,6 +22,17 @@ declare module rigger.config {
          */
         libPathes: string[];
         /**
+         * 包含路径
+         * 发布时 gulp会拷贝些路径下的文件到发布项目目录, 形式如下：
+         * ["./libs/*.ts"]
+         */
+        includingPathes: string[];
+        /**
+         * Rigger 定义文件需要发布到的路径
+         * 某些情况下可能需要将Rigger的定义文件发布到指定目录以便某些引擎进行编译
+         */
+        dtsPathes: string[];
+        /**
          * 输出目录根路径,主要用于发布Rigger或服务
          */
         outRoot: string;
