@@ -25,7 +25,7 @@ module rigger.service {
 		 * 
 		 * @example resultHandler.runWith([true]) 启动成功
 		 */
-		protected onStart(resultHandler:RiggerHandler, startupArgs:any[]):void{
+		protected onStart(resultHandler:RiggerHandler, startupArgs?:any):void{
 			resultHandler.success();
 
 		}

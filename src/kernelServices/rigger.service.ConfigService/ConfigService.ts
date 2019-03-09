@@ -45,11 +45,11 @@ module rigger.service {
 		/**
 		 * 启动服务
 		 * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-		 * @param {any[]} startupArgs 启动参数
+		 * @param {any} startupArgs 启动参数
 		 * 
 		 * @example resultHandler.runWith([true]) 启动成功
 		 */
-		start(resultHandler: RiggerHandler, serviceConfig: config.ServiceConfig, ...startupArgs: any[]): void {
+		start(resultHandler: RiggerHandler, serviceConfig: config.ServiceConfig, startupArgs?: any): void {
 			this.initApplicationConfig(resultHandler, serviceConfig, startupArgs);
 		}
 
@@ -65,7 +65,7 @@ module rigger.service {
 		 * 
 		 * @example resultHandler.runWith([true]) 启动成功
 		 */
-		protected onStart(resultHandler: RiggerHandler, startupArgs: any[]): void {
+		protected onStart(resultHandler: RiggerHandler, startupArgs?: any): void {
 			resultHandler.success();
 			// 初始化应用的配置
 			// if(!this.applicationConfig) {
@@ -153,10 +153,10 @@ module rigger.service {
 			startCb.success();
 		}
 
-		private applicationConfig: config.ApplicationConfig;
+		protected applicationConfig: config.ApplicationConfig;
 		private applicationConfigHandlers: RiggerHandler[] = [];
 		// private applicationConfigUrl:string;
-		private onApplicationConfigLoad(data: string | config.ApplicationConfig) {
+		protected onApplicationConfigLoad(data: string | config.ApplicationConfig) {
 			if (utils.Utils.isString(data)) {
 				this.applicationConfig = JSON.parse(utils.Utils.filterCommentsInJson(data));
 			}
@@ -216,7 +216,7 @@ module rigger.service {
 		 * @param serviceConfig 
 		 * @param startupArgs 
 		 */
-		private initApplicationConfig(resultHandler: RiggerHandler, serviceConfig: config.ServiceConfig, ...startupArgs: any[]) {
+		protected initApplicationConfig(resultHandler: RiggerHandler, serviceConfig: config.ServiceConfig, startupArgs?: any) {
 			this.getApplicationConfig(new RiggerHandler(this, this.doStart, [resultHandler, serviceConfig, startupArgs]));
 		}
 
@@ -243,7 +243,7 @@ module rigger.service {
 
 		// }
 
-		private doStart(resultHandler: RiggerHandler, serviceConfig: config.ServiceConfig, startupArgs: any[], cfg: config.ApplicationConfig) {
+		private doStart(resultHandler: RiggerHandler, serviceConfig: config.ServiceConfig, startupArgs: any, cfg: config.ApplicationConfig) {
 			this.getApplication().setConfig(cfg);
 			super.start(resultHandler, serviceConfig, startupArgs);
 		}

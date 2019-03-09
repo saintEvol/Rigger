@@ -26,11 +26,11 @@ declare module rigger.service {
         /**
          * 启动服务
          * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-         * @param {any[]} startupArgs 启动参数
+         * @param {any} startupArgs 启动参数
          *
          * @example resultHandler.runWith([true]) 启动成功
          */
-        start(resultHandler: RiggerHandler, serviceConfig: config.ServiceConfig, ...startupArgs: any[]): void;
+        start(resultHandler: RiggerHandler, serviceConfig: config.ServiceConfig, startupArgs?: any): void;
         /**
          * 服务名
          */
@@ -42,7 +42,7 @@ declare module rigger.service {
          *
          * @example resultHandler.runWith([true]) 启动成功
          */
-        protected onStart(resultHandler: RiggerHandler, startupArgs: any[]): void;
+        protected onStart(resultHandler: RiggerHandler, startupArgs?: any): void;
         /**
          * 停止服务时的回调
          * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
@@ -80,9 +80,9 @@ declare module rigger.service {
          */
         protected abstract loadConfig(url: string, caller: any, method: Function, args?: any): void;
         protected onApplicationConfigInit(startCb: RiggerHandler): void;
-        private applicationConfig;
+        protected applicationConfig: config.ApplicationConfig;
         private applicationConfigHandlers;
-        private onApplicationConfigLoad;
+        protected onApplicationConfigLoad(data: string | config.ApplicationConfig): void;
         private treateApplicationConfig;
         private initServiceConfigs;
         private getServiceConfigInfo;
@@ -92,7 +92,7 @@ declare module rigger.service {
          * @param serviceConfig
          * @param startupArgs
          */
-        private initApplicationConfig;
+        protected initApplicationConfig(resultHandler: RiggerHandler, serviceConfig: config.ServiceConfig, startupArgs?: any): void;
         /**
          * @plugin rigger.utils.DecoratorUtil.makeExtendable(true)
          * 生成应用的配置的路径

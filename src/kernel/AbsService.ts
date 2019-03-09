@@ -48,7 +48,7 @@ module rigger.service{
 		 * 
 		 * @example resultHandler.runWith([true]) 启动成功
 		 */
-		start(resultHandler:RiggerHandler, serviceConfig:config.ServiceConfig, ...startupArgs:any[]):void{
+		start(resultHandler:RiggerHandler, serviceConfig:config.ServiceConfig, startupArgs?:any):void{
 			this.mConfig = serviceConfig;
 			// 启动插件
 			this.startPlugins(new RiggerHandler(this, this.onAllPluginsStartComplete, [resultHandler, startupArgs]), 0, startupArgs);	
@@ -148,11 +148,11 @@ module rigger.service{
 		/**
 		 * 服务被唤醒时的回调
 		 * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-		 * @param {any[]} startupArgs 启动参数
+		 * @param {any} startupArgs 启动参数
 		 * 
 		 * @example resultHandler.runWith([true]) 启动成功
 		 */
-		protected abstract onStart(resultHandler:RiggerHandler, startupArgs:any[]):void;
+		protected abstract onStart(resultHandler:RiggerHandler, startupArgs:any):void;
 
 		/**
 		 * 停止服务时的回调
@@ -263,11 +263,11 @@ module rigger.service{
 		/**
 		 * 启动服务依赖的所有插件
 		 * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-		 * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+		 * @param {any} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
 		 * 
 		 * @example resultHandler.runWith([true]) 启动成功
 		 */
-		private startPlugins(resultHandler:RiggerHandler, index:number, startupArgs:any[]){
+		private startPlugins(resultHandler:RiggerHandler, index:number, startupArgs:any){
 			if(!this.mConfig) return resultHandler.success();
 			let infos:config.DependentComponentInfo[] = this.mConfig.plugins;
 			if(!infos) return resultHandler.success();
@@ -287,7 +287,7 @@ module rigger.service{
 		 * @param startupArgs 
 		 * @param retCode 
 		 */
-		private onPluginStartComplete(resultHandler:RiggerHandler, index:number, startupArgs:any[], plugin:IPlugin, retCode:number){
+		private onPluginStartComplete(resultHandler:RiggerHandler, index:number, startupArgs:any, plugin:IPlugin, retCode:number){
 			if(0 === retCode){
 				this.plugins.push(plugin);
 				this.addPluginToMap(plugin);
@@ -303,7 +303,7 @@ module rigger.service{
 		 * @param resultHandler 
 		 * @param startupArgs 
 		 */
-		private onAllPluginsStartComplete(resultHandler:RiggerHandler, startupArgs:any[]){
+		private onAllPluginsStartComplete(resultHandler:RiggerHandler, startupArgs:any){
 			this.onStart(resultHandler, startupArgs);
 		} 
 

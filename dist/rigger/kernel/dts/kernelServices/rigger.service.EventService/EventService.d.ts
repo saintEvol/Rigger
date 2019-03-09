@@ -16,7 +16,7 @@ declare module rigger.service {
          *
          * @example resultHandler.runWith([true]) 启动成功
          */
-        protected onStart(resultHandler: RiggerHandler, startupArgs: any[]): void;
+        protected onStart(resultHandler: RiggerHandler, startupArgs?: any): void;
         /**
          * 停止服务时的回调
          * @param {RiggerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调

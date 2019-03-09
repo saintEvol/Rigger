@@ -25,7 +25,7 @@ declare module rigger {
          * @param resultHandler
          * @param config 应用配置
          */
-        start(resultHandler: RiggerHandler): void;
+        start(resultHandler: RiggerHandler, startUpArgs?: any): void;
         /**
          * 停止应用
          */
@@ -44,14 +44,15 @@ declare module rigger {
          * @param serviceCls
          * @param cb
          */
-        startService<T extends service.AbsService>(serviceCls: any, cb: RiggerHandler, config?: config.ServiceConfig): boolean;
+        startService<T extends service.AbsService>(serviceCls: any, cb: RiggerHandler, config?: config.ServiceConfig, startUpArgs?: any): boolean;
         /**
          *
          * @param service
          * @param cb
          * @param config
+         * @param startUpArgs?
          */
-        startServiceWithConfig<T extends rigger.service.AbsService>(cls: any, ser: rigger.service.AbsService, cb: RiggerHandler, config: rigger.config.ServiceConfig): void;
+        startServiceWithConfig<T extends rigger.service.AbsService>(cls: any, ser: rigger.service.AbsService, cb: RiggerHandler, config: rigger.config.ServiceConfig, startUpArgs?: any): void;
         /**
          * 根据服务名获取服务
          * @param serviceName
@@ -119,6 +120,7 @@ declare module rigger {
          * 启动服务
          * @param service
          * @param cb
+         * @param {...any[]} startUpArgs
          */
         private doStartService;
         /**

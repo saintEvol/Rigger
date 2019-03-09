@@ -42,9 +42,9 @@ module rigger {
 		 * @param resultHandler 
 		 * @param config 应用配置
 		 */
-		public start(resultHandler: RiggerHandler): void {
+		public start(resultHandler: RiggerHandler, startUpArgs?: any): void {
 			// 启动核心服务
-			this.startKernelService(new RiggerHandler(this, this.onAllServicesReady, [resultHandler]));
+			this.startKernelService(new RiggerHandler(this, this.onAllServicesReady, [resultHandler]), startUpArgs);
 		}
 
 		/**
@@ -74,7 +74,7 @@ module rigger {
 		 * @param serviceCls 
 		 * @param cb 
 		 */
-		public startService<T extends service.AbsService>(serviceCls: any, cb: RiggerHandler, config: config.ServiceConfig = null): boolean {
+		public startService<T extends service.AbsService>(serviceCls: any, cb: RiggerHandler, config: config.ServiceConfig = null, startUpArgs?: any): boolean {
 			// 检查是否已经注册过
 			let serviceName: string = serviceCls.serviceName;
 			let service: T = this.getService<T>(serviceName);
@@ -90,14 +90,14 @@ module rigger {
 			this.registerService(serviceName, service);
 
 			if (config) {
-				this.startServiceWithConfig(serviceCls, service, cb, config);
+				this.startServiceWithConfig(serviceCls, service, cb, config, startUpArgs);
 			}
 			else {
 				// 获取配置,为启动服务作准备
 				let configService: service.ConfigService = this.getRunningService<service.ConfigService>(rigger.service.ConfigService.serviceName);
 				if (configService) {
-					let serConfig:config.ServiceConfig = configService.getServiceConfig(serviceName);
-					this.startServiceWithConfig(serviceCls, service, cb, serConfig);
+					let serConfig: config.ServiceConfig = configService.getServiceConfig(serviceName);
+					this.startServiceWithConfig(serviceCls, service, cb, serConfig, startUpArgs);
 					// if(serConfig){
 					// 	this.startServiceWithConfig(serviceCls, service, cb, serConfig);
 					// }
@@ -108,7 +108,7 @@ module rigger {
 				}
 				// 配置服务特殊处理
 				else if (serviceName === rigger.service.ConfigService.serviceName || serviceName === this.newConfigServiceName) {
-					this.startServiceWithConfig(serviceCls, service, cb, null);
+					this.startServiceWithConfig(serviceCls, service, cb, null, startUpArgs);
 				}
 				else {
 					throw new Error("Non-kernel service should be start after ConfigService");
@@ -123,9 +123,10 @@ module rigger {
 		 * @param service 
 		 * @param cb 
 		 * @param config 
+		 * @param startUpArgs?
 		 */
 		public startServiceWithConfig<T extends rigger.service.AbsService>(cls: any, ser: rigger.service.AbsService,
-			cb: RiggerHandler, config: rigger.config.ServiceConfig, ) {
+			cb: RiggerHandler, config: rigger.config.ServiceConfig, startUpArgs?: any) {
 			if (config) {
 				if (!utils.Utils.isNullOrEmpty(config.fullName)) {
 					cls.serviceName = config.fullName;
@@ -139,14 +140,14 @@ module rigger {
 			if (deps && deps.length > 0) {
 				for (var i: number = 0; i < deps.length; ++i) {
 					let serviceCls: any = this.makeServiceClass(deps[i].fullName);
-					if (!this.startService(serviceCls, new RiggerHandler(this, this.startServiceWithConfig, [cls, ser, cb, config]))) {
+					if (!this.startService(serviceCls, new RiggerHandler(this, this.startServiceWithConfig, [cls, ser, cb, config, startUpArgs]), null, startUpArgs)) {
 						return;
 					}
 				}
 			}
 
 			// 准备好了，直接启动
-			this.doStartService(cls, ser, config, cb);
+			this.doStartService(cls, ser, config, cb, startUpArgs);
 		}
 
 		/**
@@ -242,15 +243,15 @@ module rigger {
 
 		}
 
-		private onKernelServiceReady(cb: RiggerHandler) {
+		private onKernelServiceReady(cb: RiggerHandler, startUpArgs?: any) {
 			console.log("KernelService Ready!");
-			this.startNonKernelService(cb);
+			this.startNonKernelService(cb, startUpArgs);
 		}
 
 		/**
 		 * 启动核心服务
 		 */
-		private startKernelService(cb: RiggerHandler) {
+		private startKernelService(cb: RiggerHandler, startUpArgs?: any) {
 			// 构造核心服务配置
 			let kernelConfig: rigger.config.ServiceConfig = new rigger.config.ServiceConfig();
 
@@ -270,16 +271,16 @@ module rigger {
 			kernelConfig.services = [depService1, depService2, depService3];
 
 			this.startService(this.makeServiceClass(rigger.service.KernelService.serviceName),
-				new RiggerHandler(this, this.onKernelServiceReady, [cb]), kernelConfig);
+				new RiggerHandler(this, this.onKernelServiceReady, [cb, startUpArgs]), kernelConfig, startUpArgs);
 		}
 
 		/**
 		 * 启动非核心服务（用户自己配置的）
 		 * @param cb 
 		 */
-		private startNonKernelService(cb: RiggerHandler) {
+		private startNonKernelService(cb: RiggerHandler, startUpArgs?: any) {
 			let configService: service.ConfigService = this.getRunningService<service.ConfigService>(service.ConfigService.serviceName);
-			configService.getApplicationConfig(new RiggerHandler(this, this.startApplicationDependentService, [0, cb]));
+			configService.getApplicationConfig(new RiggerHandler(this, this.startApplicationDependentService, [0, cb, startUpArgs]));
 		}
 
 		/**
@@ -287,7 +288,7 @@ module rigger {
 		 * @param index 
 		 * @param appConfig 
 		 */
-		private startApplicationDependentService(index: number, cb: RiggerHandler, appConfig: config.ApplicationConfig) {
+		private startApplicationDependentService(index: number, cb: RiggerHandler, startUpArgs: any, appConfig: config.ApplicationConfig, ) {
 			if (!appConfig) throw new Error("faild to get application config.");
 			let serviceList: config.ServiceConfig[][] = appConfig.services;
 			if (serviceList.length <= index) return cb.run();
@@ -297,13 +298,13 @@ module rigger {
 			for (var i: number = 0; i < serviceList[index].length; ++i) {
 				serviceCls = this.makeServiceClass(serviceList[index][i].fullName);
 				serviceCls.serviceName = serviceList[index][i].fullName;
-				if (!this.startService(serviceCls, new RiggerHandler(this, this.startApplicationDependentService, [index, cb, appConfig]))) {
+				if (!this.startService(serviceCls, new RiggerHandler(this, this.startApplicationDependentService, [index, cb, startUpArgs, appConfig]), null, startUpArgs)) {
 					ready = false;
 				}
 			}
 
 			if (ready) {
-				this.startApplicationDependentService(index + 1, cb, appConfig);
+				this.startApplicationDependentService(index + 1, cb, startUpArgs, appConfig);
 			}
 
 		}
@@ -312,11 +313,12 @@ module rigger {
 		 * 启动服务
 		 * @param service 
 		 * @param cb 
+		 * @param {...any[]} startUpArgs
 		 */
-		private doStartService(cls: any, service: rigger.service.IService, config: config.ServiceConfig, cb: RiggerHandler) {
+		private doStartService(cls: any, service: rigger.service.IService, config: config.ServiceConfig, cb: RiggerHandler, startUpArgs: any) {
 			service.setApplication(this);
 			console.log(`starting ${cls.serviceName}`);
-			service.start(new RiggerHandler(this, this.onServiceStartComplete, [cls, service, cb]), config);
+			service.start(new RiggerHandler(this, this.onServiceStartComplete, [cls, service, cb]), config, startUpArgs);
 		}
 
 		/**

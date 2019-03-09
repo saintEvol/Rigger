@@ -31,11 +31,11 @@ declare module rigger.service {
          * 启动服务
          * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
          * @param {config.ServiceConfig} serviceConfig 服务配置
-         * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+         * @param {any?} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
          *
          * @example resultHandler.runWith([true]) 启动成功
          */
-        start(resultHandler: RiggerHandler, serviceCofig: config.ServiceConfig, ...startupArgs: any[]): void;
+        start(resultHandler: RiggerHandler, serviceCofig: config.ServiceConfig, startupArgs?: any): void;
         /**
          * 停止服务
          * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调

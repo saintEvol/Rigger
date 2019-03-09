@@ -176,11 +176,7 @@ var rigger;
              *
              * @example resultHandler.runWith([true]) 启动成功
              */
-            AbsService.prototype.start = function (resultHandler, serviceConfig) {
-                var startupArgs = [];
-                for (var _i = 2; _i < arguments.length; _i++) {
-                    startupArgs[_i - 2] = arguments[_i];
-                }
+            AbsService.prototype.start = function (resultHandler, serviceConfig, startupArgs) {
                 this.mConfig = serviceConfig;
                 // 启动插件
                 this.startPlugins(new rigger.RiggerHandler(this, this.onAllPluginsStartComplete, [resultHandler, startupArgs]), 0, startupArgs);
@@ -348,7 +344,7 @@ var rigger;
             /**
              * 启动服务依赖的所有插件
              * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @param {any} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
              *
              * @example resultHandler.runWith([true]) 启动成功
              */
@@ -550,9 +546,9 @@ var rigger;
          * @param resultHandler
          * @param config 应用配置
          */
-        BaseApplication.prototype.start = function (resultHandler) {
+        BaseApplication.prototype.start = function (resultHandler, startUpArgs) {
             // 启动核心服务
-            this.startKernelService(new rigger.RiggerHandler(this, this.onAllServicesReady, [resultHandler]));
+            this.startKernelService(new rigger.RiggerHandler(this, this.onAllServicesReady, [resultHandler]), startUpArgs);
         };
         /**
          * 停止应用
@@ -576,7 +572,7 @@ var rigger;
          * @param serviceCls
          * @param cb
          */
-        BaseApplication.prototype.startService = function (serviceCls, cb, config) {
+        BaseApplication.prototype.startService = function (serviceCls, cb, config, startUpArgs) {
             if (config === void 0) { config = null; }
             // 检查是否已经注册过
             var serviceName = serviceCls.serviceName;
@@ -591,14 +587,14 @@ var rigger;
             // 注册服务			
             this.registerService(serviceName, service);
             if (config) {
-                this.startServiceWithConfig(serviceCls, service, cb, config);
+                this.startServiceWithConfig(serviceCls, service, cb, config, startUpArgs);
             }
             else {
                 // 获取配置,为启动服务作准备
                 var configService = this.getRunningService(rigger.service.ConfigService.serviceName);
                 if (configService) {
                     var serConfig = configService.getServiceConfig(serviceName);
-                    this.startServiceWithConfig(serviceCls, service, cb, serConfig);
+                    this.startServiceWithConfig(serviceCls, service, cb, serConfig, startUpArgs);
                     // if(serConfig){
                     // 	this.startServiceWithConfig(serviceCls, service, cb, serConfig);
                     // }
@@ -609,7 +605,7 @@ var rigger;
                 }
                 // 配置服务特殊处理
                 else if (serviceName === rigger.service.ConfigService.serviceName || serviceName === this.newConfigServiceName) {
-                    this.startServiceWithConfig(serviceCls, service, cb, null);
+                    this.startServiceWithConfig(serviceCls, service, cb, null, startUpArgs);
                 }
                 else {
                     throw new Error("Non-kernel service should be start after ConfigService");
@@ -622,8 +618,9 @@ var rigger;
          * @param service
          * @param cb
          * @param config
+         * @param startUpArgs?
          */
-        BaseApplication.prototype.startServiceWithConfig = function (cls, ser, cb, config) {
+        BaseApplication.prototype.startServiceWithConfig = function (cls, ser, cb, config, startUpArgs) {
             if (config) {
                 if (!rigger.utils.Utils.isNullOrEmpty(config.fullName)) {
                     cls.serviceName = config.fullName;
@@ -636,13 +633,13 @@ var rigger;
             if (deps && deps.length > 0) {
                 for (var i = 0; i < deps.length; ++i) {
                     var serviceCls = this.makeServiceClass(deps[i].fullName);
-                    if (!this.startService(serviceCls, new rigger.RiggerHandler(this, this.startServiceWithConfig, [cls, ser, cb, config]))) {
+                    if (!this.startService(serviceCls, new rigger.RiggerHandler(this, this.startServiceWithConfig, [cls, ser, cb, config, startUpArgs]), null, startUpArgs)) {
                         return;
                     }
                 }
             }
             // 准备好了，直接启动
-            this.doStartService(cls, ser, config, cb);
+            this.doStartService(cls, ser, config, cb, startUpArgs);
         };
         /**
          * 根据服务名获取服务
@@ -731,14 +728,14 @@ var rigger;
                 return serviceName;
             return newService.serviceName;
         };
-        BaseApplication.prototype.onKernelServiceReady = function (cb) {
+        BaseApplication.prototype.onKernelServiceReady = function (cb, startUpArgs) {
             console.log("KernelService Ready!");
-            this.startNonKernelService(cb);
+            this.startNonKernelService(cb, startUpArgs);
         };
         /**
          * 启动核心服务
          */
-        BaseApplication.prototype.startKernelService = function (cb) {
+        BaseApplication.prototype.startKernelService = function (cb, startUpArgs) {
             // 构造核心服务配置
             var kernelConfig = new rigger.config.ServiceConfig();
             // 配置服务
@@ -752,22 +749,22 @@ var rigger;
             depService3.fullName = rigger.service.EventService.serviceName;
             // 先启动配置服务,再启动其它依赖服务
             kernelConfig.services = [depService1, depService2, depService3];
-            this.startService(this.makeServiceClass(rigger.service.KernelService.serviceName), new rigger.RiggerHandler(this, this.onKernelServiceReady, [cb]), kernelConfig);
+            this.startService(this.makeServiceClass(rigger.service.KernelService.serviceName), new rigger.RiggerHandler(this, this.onKernelServiceReady, [cb, startUpArgs]), kernelConfig, startUpArgs);
         };
         /**
          * 启动非核心服务（用户自己配置的）
          * @param cb
          */
-        BaseApplication.prototype.startNonKernelService = function (cb) {
+        BaseApplication.prototype.startNonKernelService = function (cb, startUpArgs) {
             var configService = this.getRunningService(rigger.service.ConfigService.serviceName);
-            configService.getApplicationConfig(new rigger.RiggerHandler(this, this.startApplicationDependentService, [0, cb]));
+            configService.getApplicationConfig(new rigger.RiggerHandler(this, this.startApplicationDependentService, [0, cb, startUpArgs]));
         };
         /**
          * 启动应用依赖的各项服务
          * @param index
          * @param appConfig
          */
-        BaseApplication.prototype.startApplicationDependentService = function (index, cb, appConfig) {
+        BaseApplication.prototype.startApplicationDependentService = function (index, cb, startUpArgs, appConfig) {
             if (!appConfig)
                 throw new Error("faild to get application config.");
             var serviceList = appConfig.services;
@@ -778,23 +775,24 @@ var rigger;
             for (var i = 0; i < serviceList[index].length; ++i) {
                 serviceCls = this.makeServiceClass(serviceList[index][i].fullName);
                 serviceCls.serviceName = serviceList[index][i].fullName;
-                if (!this.startService(serviceCls, new rigger.RiggerHandler(this, this.startApplicationDependentService, [index, cb, appConfig]))) {
+                if (!this.startService(serviceCls, new rigger.RiggerHandler(this, this.startApplicationDependentService, [index, cb, startUpArgs, appConfig]), null, startUpArgs)) {
                     ready = false;
                 }
             }
             if (ready) {
-                this.startApplicationDependentService(index + 1, cb, appConfig);
+                this.startApplicationDependentService(index + 1, cb, startUpArgs, appConfig);
             }
         };
         /**
          * 启动服务
          * @param service
          * @param cb
+         * @param {...any[]} startUpArgs
          */
-        BaseApplication.prototype.doStartService = function (cls, service, config, cb) {
+        BaseApplication.prototype.doStartService = function (cls, service, config, cb, startUpArgs) {
             service.setApplication(this);
             console.log("starting " + cls.serviceName);
-            service.start(new rigger.RiggerHandler(this, this.onServiceStartComplete, [cls, service, cb]), config);
+            service.start(new rigger.RiggerHandler(this, this.onServiceStartComplete, [cls, service, cb]), config, startUpArgs);
         };
         /**
          * 服务启动完成
@@ -1831,15 +1829,11 @@ var rigger;
             /**
              * 启动服务
              * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @param {any[]} startupArgs 启动参数
+             * @param {any} startupArgs 启动参数
              *
              * @example resultHandler.runWith([true]) 启动成功
              */
-            ConfigService.prototype.start = function (resultHandler, serviceConfig) {
-                var startupArgs = [];
-                for (var _i = 2; _i < arguments.length; _i++) {
-                    startupArgs[_i - 2] = arguments[_i];
-                }
+            ConfigService.prototype.start = function (resultHandler, serviceConfig, startupArgs) {
                 this.initApplicationConfig(resultHandler, serviceConfig, startupArgs);
             };
             /**
@@ -1949,11 +1943,7 @@ var rigger;
              * @param serviceConfig
              * @param startupArgs
              */
-            ConfigService.prototype.initApplicationConfig = function (resultHandler, serviceConfig) {
-                var startupArgs = [];
-                for (var _i = 2; _i < arguments.length; _i++) {
-                    startupArgs[_i - 2] = arguments[_i];
-                }
+            ConfigService.prototype.initApplicationConfig = function (resultHandler, serviceConfig, startupArgs) {
                 this.getApplicationConfig(new rigger.RiggerHandler(this, this.doStart, [resultHandler, serviceConfig, startupArgs]));
             };
             /**
