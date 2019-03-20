@@ -38,6 +38,11 @@ module rigger {
 		public static replacedServiceMap: {} = {};
 
 		/**
+		 * 服务全名与其定义的映射
+		 */
+		public static serviceFullNameDefinitionMap: {} = {};
+
+		/**
 		 * 
 		 * @param resultHandler 
 		 * @param config 应用配置
@@ -226,9 +231,21 @@ module rigger {
 		private makeServiceClass(serviceName: string): any {
 			if (!BaseApplication.replacedServiceMap) return eval(serviceName);
 			let newService: any = BaseApplication.replacedServiceMap[serviceName];
-			if (rigger.utils.Utils.isNullOrUndefined(newService)) return eval(serviceName);
+			if (rigger.utils.Utils.isNullOrUndefined(newService)) return this.doMakeServiceClass(serviceName);
 			if (service.ConfigService.serviceName === serviceName) this.newConfigServiceName = newService.serviceName;
 			return newService;
+		}
+
+		private doMakeServiceClass(serviceName: string): any{
+			if(!BaseApplication.serviceFullNameDefinitionMap) return eval(serviceName);
+			// 查找是否直接有映射
+			let Def: Function = BaseApplication.serviceFullNameDefinitionMap[serviceName];
+			if(Def){
+				return Def;
+			}
+			else{
+				return eval(serviceName);
+			}
 		}
 
 		/**

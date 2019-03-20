@@ -52,8 +52,13 @@ declare module rigger.utils {
          */
         static isNullOrEmpty(str: string): boolean;
         /**
+         * 判断值是否是一个数字(而不管是否可以转化成一个数字)
+         * @param {any} value
+         */
+        static isNumber(value: any): boolean;
+        /**
          * 判断一人数字是否是整数
-         * @param num 需要进行判断的数字
+         * @param {number} num 需要进行判断的数字
          */
         static isInteger(num: number): boolean;
         /**

@@ -6,7 +6,7 @@ module rigger{
 		/**
 		 * 开始插件（添加插件时调用)
 		 */
-		start(resultHandler:RiggerHandler, ...startupArgs:any[]):void;
+		start(resultHandler:RiggerHandler, startupArgs?:any):void;
 
 		/**
 		 * 停止插件（卸载插件时调用)

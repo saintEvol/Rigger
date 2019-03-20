@@ -359,7 +359,7 @@ var rigger;
                 var pluginClass = eval(infos[index].fullName);
                 var inst = new pluginClass();
                 inst.setOwner(this);
-                inst.start(new rigger.RiggerHandler(this, this.onPluginStartComplete, [resultHandler, index + 1, startupArgs, inst]));
+                inst.start(new rigger.RiggerHandler(this, this.onPluginStartComplete, [resultHandler, index + 1, startupArgs, inst]), startupArgs);
             };
             /**
              * 单个插件启动成功
@@ -463,11 +463,7 @@ var rigger;
         /**
          * 开始插件（添加插件时调用)
          */
-        AbsServicePlugin.prototype.start = function (resultHandler) {
-            var startupArgs = [];
-            for (var _i = 1; _i < arguments.length; _i++) {
-                startupArgs[_i - 1] = arguments[_i];
-            }
+        AbsServicePlugin.prototype.start = function (resultHandler, startupArgs) {
             this.onStart(resultHandler, startupArgs);
         };
         /**
@@ -1251,8 +1247,19 @@ var rigger;
                 return utils.Utils.isNullOrUndefined(str) || str.length <= 0;
             };
             /**
+             * 判断值是否是一个数字(而不管是否可以转化成一个数字)
+             * @param {any} value
+             */
+            Utils.isNumber = function (value) {
+                if (Utils.isNullOrUndefined(value))
+                    return false;
+                if (Utils.isString(value))
+                    return false;
+                return !isNaN(value);
+            };
+            /**
              * 判断一人数字是否是整数
-             * @param num 需要进行判断的数字
+             * @param {number} num 需要进行判断的数字
              */
             Utils.isInteger = function (num) {
                 return 0 === num % 1;
@@ -2143,64 +2150,6 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 /**
-* 核心服务
-*/
-var rigger;
-(function (rigger) {
-    var service;
-    (function (service) {
-        var KernelService = /** @class */ (function (_super) {
-            __extends(KernelService, _super);
-            function KernelService() {
-                return _super.call(this) || this;
-            }
-            /**
-             * 服务启动时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             *
-             * @example resultHandler.runWith([true]) 启动成功
-             */
-            KernelService.prototype.onStart = function (resultHandler, startupArgs) {
-                resultHandler.success();
-            };
-            /**
-             * 停止服务时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 服务停用成功
-             */
-            KernelService.prototype.onStop = function (resultHandler) {
-                resultHandler.success();
-            };
-            /**
-             * 启动服务时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 重启
-             */
-            KernelService.prototype.onReStart = function (resultHandler) {
-                resultHandler.success();
-            };
-            /**
-             * 服务名
-             */
-            KernelService.serviceName = "rigger.service.KernelService";
-            return KernelService;
-        }(service.AbsService));
-        service.KernelService = KernelService;
-    })(service = rigger.service || (rigger.service = {}));
-})(rigger || (rigger = {}));
-
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-/**
 * name
 */
 var rigger;
@@ -2374,5 +2323,63 @@ var rigger;
             return PoolService;
         }(service.AbsService));
         service.PoolService = PoolService;
+    })(service = rigger.service || (rigger.service = {}));
+})(rigger || (rigger = {}));
+
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+/**
+* 核心服务
+*/
+var rigger;
+(function (rigger) {
+    var service;
+    (function (service) {
+        var KernelService = /** @class */ (function (_super) {
+            __extends(KernelService, _super);
+            function KernelService() {
+                return _super.call(this) || this;
+            }
+            /**
+             * 服务启动时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             *
+             * @example resultHandler.runWith([true]) 启动成功
+             */
+            KernelService.prototype.onStart = function (resultHandler, startupArgs) {
+                resultHandler.success();
+            };
+            /**
+             * 停止服务时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 服务停用成功
+             */
+            KernelService.prototype.onStop = function (resultHandler) {
+                resultHandler.success();
+            };
+            /**
+             * 启动服务时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 重启
+             */
+            KernelService.prototype.onReStart = function (resultHandler) {
+                resultHandler.success();
+            };
+            /**
+             * 服务名
+             */
+            KernelService.serviceName = "rigger.service.KernelService";
+            return KernelService;
+        }(service.AbsService));
+        service.KernelService = KernelService;
     })(service = rigger.service || (rigger.service = {}));
 })(rigger || (rigger = {}));
