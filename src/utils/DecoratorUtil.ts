@@ -35,6 +35,31 @@ module rigger.utils {
             }
         }
 
+        /**
+         * 类装饰器
+         * 对服务或插件进行注册,此接口主要用于无法动态使用eval函数根据全名获取其类定义的情形
+         * 使用此装饰器进行注册时，类应该至少定义了有效的"pluginName"或"serviceName"静态成员之一
+         * @param ct 
+         * @throws 如果被装饰的类中没有定义有效的"pluginName"或"serviceName"静态成员之一,会抛出错误
+         * @example @register export default class TestPlugin {}
+         */
+        public static register(ct: Function){
+            // 检查是否就可注册插件
+            if(!Utils.isNullOrEmpty(ct["pluginName"])){
+                BaseApplication.pluginFullNameDefinitionMap[ct["pluginName"]] = ct;
+            }
+            else{
+                // 是否是可注册服务
+                if(!Utils.isNullOrEmpty(ct["serviceName"])){
+                    BaseApplication.serviceFullNameDefinitionMap[ct["serviceName"]] = ct;
+                }
+                else{
+                    // 都不是，报错
+                    throw new Error("not a registable service or plugin, please check, constructor:" + ct) ;
+                }
+            }
+        }
+
         private static extendableMethodMapKey:string = "_$extendableMethodMapKey"
         public static makeExtendable(beReplacable:boolean = false){
             return DecoratorUtil.makeExtenasionMethod(beReplacable);

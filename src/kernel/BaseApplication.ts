@@ -43,6 +43,11 @@ module rigger {
 		public static serviceFullNameDefinitionMap: {} = {};
 
 		/**
+		 * 插件命名及其定义的映射
+		 */
+		public static pluginFullNameDefinitionMap: {} = {};
+
+		/**
 		 * 
 		 * @param resultHandler 
 		 * @param config 应用配置
@@ -229,21 +234,25 @@ module rigger {
 
 		private newConfigServiceName: string;
 		private makeServiceClass(serviceName: string): any {
-			if (!BaseApplication.replacedServiceMap) return eval(serviceName);
+			// 没有替换信息，直接生成服务类
+			if (!BaseApplication.replacedServiceMap) return this.doMakeServiceClass(serviceName)
 			let newService: any = BaseApplication.replacedServiceMap[serviceName];
+			// 没有指定服务的替换信息，直接生成服务类
 			if (rigger.utils.Utils.isNullOrUndefined(newService)) return this.doMakeServiceClass(serviceName);
 			if (service.ConfigService.serviceName === serviceName) this.newConfigServiceName = newService.serviceName;
 			return newService;
 		}
 
-		private doMakeServiceClass(serviceName: string): any{
-			if(!BaseApplication.serviceFullNameDefinitionMap) return eval(serviceName);
+		private doMakeServiceClass(serviceName: string): any {
+			// 没有服务注册信息,直接尝试动态计算
+			if (!BaseApplication.serviceFullNameDefinitionMap) return eval(serviceName);
 			// 查找是否直接有映射
 			let Def: Function = BaseApplication.serviceFullNameDefinitionMap[serviceName];
-			if(Def){
+			// 检查是否有指定服务的注册信息
+			if (Def) {
 				return Def;
 			}
-			else{
+			else {
 				return eval(serviceName);
 			}
 		}

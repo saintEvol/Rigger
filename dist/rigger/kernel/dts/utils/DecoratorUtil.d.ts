@@ -17,6 +17,15 @@ declare module rigger.utils {
          * @param oldServiceName 被替换的服务名
          */
         static replaceService(oldServiceName: string): (ctor: any, attrName: string) => void;
+        /**
+         * 类装饰器
+         * 对服务或插件进行注册,此接口主要用于无法动态使用eval函数根据全名获取其类定义的情形
+         * 使用此装饰器进行注册时，类应该至少定义了有效的"pluginName"或"serviceName"静态成员之一
+         * @param ct
+         * @throws 如果被装饰的类中没有定义有效的"pluginName"或"serviceName"静态成员之一,会抛出错误
+         * @example @register export default class TestPlugin {}
+         */
+        static register(ct: Function): void;
         private static extendableMethodMapKey;
         static makeExtendable(beReplacable?: boolean): Function;
         private static makeExtenasionMethod;

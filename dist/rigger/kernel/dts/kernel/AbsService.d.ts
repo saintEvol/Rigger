@@ -180,5 +180,6 @@ declare module rigger.service {
         private onAllPluginsStopComplete;
         private addPluginToMap;
         private executeMethodExtension;
+        private makePluginClass;
     }
 }

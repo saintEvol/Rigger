@@ -9,7 +9,7 @@ module rigger.service {
 		/**
 		 * 服务名
 		 */
-		public static serviceName: string = "AbsService";
+		public static serviceName: string = undefined;
 
 		/**
 		 * 获取应用
@@ -272,7 +272,7 @@ module rigger.service {
 			let infos: config.DependentComponentInfo[] = this.mConfig.plugins;
 			if (!infos) return resultHandler.success();
 			if (index >= infos.length) return resultHandler.success();
-			let pluginClass: any = eval(infos[index].fullName);
+			let pluginClass: any = this.makePluginClass(infos[index].fullName);
 			let inst: IPlugin = new pluginClass();
 			inst.setOwner(this);
 			inst.start(new RiggerHandler(this, this.onPluginStartComplete, [resultHandler, index + 1, startupArgs, inst]), startupArgs)
@@ -363,6 +363,13 @@ module rigger.service {
 			}
 
 			return initRet;
+		}
+
+		private makePluginClass(fullName: string): any {
+			// 优先从注册信息中查找
+			if (BaseApplication.pluginFullNameDefinitionMap && BaseApplication.pluginFullNameDefinitionMap[fullName]) return BaseApplication.pluginFullNameDefinitionMap[fullName];
+			// 动态计算
+			return eval(fullName);
 		}
 	}
 }

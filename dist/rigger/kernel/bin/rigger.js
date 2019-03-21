@@ -356,7 +356,7 @@ var rigger;
                     return resultHandler.success();
                 if (index >= infos.length)
                     return resultHandler.success();
-                var pluginClass = eval(infos[index].fullName);
+                var pluginClass = this.makePluginClass(infos[index].fullName);
                 var inst = new pluginClass();
                 inst.setOwner(this);
                 inst.start(new rigger.RiggerHandler(this, this.onPluginStartComplete, [resultHandler, index + 1, startupArgs, inst]), startupArgs);
@@ -436,10 +436,17 @@ var rigger;
                 }
                 return initRet;
             };
+            AbsService.prototype.makePluginClass = function (fullName) {
+                // 优先从注册信息中查找
+                if (rigger.BaseApplication.pluginFullNameDefinitionMap && rigger.BaseApplication.pluginFullNameDefinitionMap[fullName])
+                    return rigger.BaseApplication.pluginFullNameDefinitionMap[fullName];
+                // 动态计算
+                return eval(fullName);
+            };
             /**
              * 服务名
              */
-            AbsService.serviceName = "AbsService";
+            AbsService.serviceName = undefined;
             AbsService.application = null;
             return AbsService;
         }());
@@ -703,14 +710,30 @@ var rigger;
             resultHandler.success();
         };
         BaseApplication.prototype.makeServiceClass = function (serviceName) {
+            // 没有替换信息，直接生成服务类
             if (!BaseApplication.replacedServiceMap)
-                return eval(serviceName);
+                return this.doMakeServiceClass(serviceName);
             var newService = BaseApplication.replacedServiceMap[serviceName];
+            // 没有指定服务的替换信息，直接生成服务类
             if (rigger.utils.Utils.isNullOrUndefined(newService))
-                return eval(serviceName);
+                return this.doMakeServiceClass(serviceName);
             if (rigger.service.ConfigService.serviceName === serviceName)
                 this.newConfigServiceName = newService.serviceName;
             return newService;
+        };
+        BaseApplication.prototype.doMakeServiceClass = function (serviceName) {
+            // 没有服务注册信息,直接尝试动态计算
+            if (!BaseApplication.serviceFullNameDefinitionMap)
+                return eval(serviceName);
+            // 查找是否直接有映射
+            var Def = BaseApplication.serviceFullNameDefinitionMap[serviceName];
+            // 检查是否有指定服务的注册信息
+            if (Def) {
+                return Def;
+            }
+            else {
+                return eval(serviceName);
+            }
         };
         /**
          * 获取真正的服务名(可以将服务名转换成被替换后的服务名)
@@ -804,6 +827,14 @@ var rigger;
             }
         };
         BaseApplication.replacedServiceMap = {};
+        /**
+         * 服务全名与其定义的映射
+         */
+        BaseApplication.serviceFullNameDefinitionMap = {};
+        /**
+         * 插件命名及其定义的映射
+         */
+        BaseApplication.pluginFullNameDefinitionMap = {};
         return BaseApplication;
     }());
     rigger.BaseApplication = BaseApplication;
@@ -973,6 +1004,30 @@ var rigger;
                 return function (ctor, attrName) {
                     rigger.BaseApplication.replacedServiceMap[oldServiceName] = ctor;
                 };
+            };
+            /**
+             * 类装饰器
+             * 对服务或插件进行注册,此接口主要用于无法动态使用eval函数根据全名获取其类定义的情形
+             * 使用此装饰器进行注册时，类应该至少定义了有效的"pluginName"或"serviceName"静态成员之一
+             * @param ct
+             * @throws 如果被装饰的类中没有定义有效的"pluginName"或"serviceName"静态成员之一,会抛出错误
+             * @example @register export default class TestPlugin {}
+             */
+            DecoratorUtil.register = function (ct) {
+                // 检查是否就可注册插件
+                if (!utils.Utils.isNullOrEmpty(ct["pluginName"])) {
+                    rigger.BaseApplication.pluginFullNameDefinitionMap[ct["pluginName"]] = ct;
+                }
+                else {
+                    // 是否是可注册服务
+                    if (!utils.Utils.isNullOrEmpty(ct["serviceName"])) {
+                        rigger.BaseApplication.serviceFullNameDefinitionMap[ct["serviceName"]] = ct;
+                    }
+                    else {
+                        // 都不是，报错
+                        throw new Error("not a registable service or plugin, please check, constructor:" + ct);
+                    }
+                }
             };
             DecoratorUtil.makeExtendable = function (beReplacable) {
                 if (beReplacable === void 0) { beReplacable = false; }
@@ -1296,6 +1351,11 @@ var rigger;
         utils.Utils = Utils;
     })(utils = rigger.utils || (rigger.utils = {}));
 })(rigger || (rigger = {}));
+
+
+
+
+
 
 /**
 * 有限状态机类
@@ -1778,10 +1838,398 @@ var rigger;
     rigger.FSMUtils = FSMUtils;
 })(rigger || (rigger = {}));
 
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+/**
+ * 事件服务
+ */
+var rigger;
+(function (rigger) {
+    var service;
+    (function (service) {
+        var EventService = /** @class */ (function (_super) {
+            __extends(EventService, _super);
+            function EventService() {
+                var _this = _super.call(this) || this;
+                _this.HANDLER_FIELD_TYPE_CALLER = 1;
+                _this.HANDLER_FIELD_TYPE_HANDLER = 2;
+                _this.HANDLER_FIELD_TYPE_INSTANCE = 3;
+                _this._handlerMap = {};
+                return _this;
+            }
+            Object.defineProperty(EventService, "instance", {
+                get: function () {
+                    return EventService.getRunningService(EventService.serviceName);
+                },
+                enumerable: true,
+                configurable: true
+            });
+            /**
+             * 服务启动时的回调
+             * @param {RiggerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             *
+             * @example resultHandler.runWith([true]) 启动成功
+             */
+            EventService.prototype.onStart = function (resultHandler, startupArgs) {
+                resultHandler.success();
+            };
+            /**
+             * 停止服务时的回调
+             * @param {RiggerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 服务停用成功
+             */
+            EventService.prototype.onStop = function (resultHandler) {
+                this._handlerMap = null;
+                resultHandler.success();
+            };
+            /**
+             * 启动服务时的回调
+             * @param {RiggerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 重启
+             */
+            EventService.prototype.onReStart = function (resultHandler) {
+                resultHandler.success();
+            };
+            // public addProtocolListener(protocolId: number, caller: any, handler: GameEventHandler) {
+            // 	this.addEventListener(protocolId, NetworkManager.instance, caller, handler);
+            // }
+            // public removeProtocolListener(protocolId: number, caller: any, handler: GameEventHandler) {
+            // 	this.removeEventListener(protocolId, NetworkManager.instance, caller, handler);
+            // }
+            /**
+             * 注册事件监听
+             */
+            EventService.prototype.addEventListener = function (eventName, obj, caller, handler) {
+                if (obj === void 0) { obj = null; }
+                try {
+                    var oldHandlers = this._handlerMap[eventName];
+                    if (oldHandlers) {
+                        oldHandlers.push({ 1: caller, 2: handler, 3: obj });
+                    }
+                    else {
+                        this._handlerMap[eventName] = [{ 1: caller, 2: handler, 3: obj }];
+                    }
+                }
+                catch (error) {
+                    console.log("error when add event listener:" + error);
+                    console.log(error.stack);
+                }
+            };
+            /**
+             * 移除事件监听
+             */
+            EventService.prototype.removeEventListener = function (eventName, obj, caller, handler) {
+                var hadHandlers = this._handlerMap[eventName];
+                var newHandlers = [];
+                if (hadHandlers) {
+                    for (var index = 0; index < hadHandlers.length; index++) {
+                        if (obj != hadHandlers[index][3] || caller != hadHandlers[index][1] || handler != hadHandlers[index][2]) {
+                            newHandlers.push(hadHandlers[index]);
+                        }
+                    }
+                    this._handlerMap[eventName] = newHandlers;
+                }
+            };
+            /**
+             * 派发事件注册了的事件将被触发
+             */
+            EventService.prototype.dispatchEvent = function (eventName, obj) {
+                if (obj === void 0) { obj = null; }
+                var data = [];
+                for (var _i = 2; _i < arguments.length; _i++) {
+                    data[_i - 2] = arguments[_i];
+                }
+                var hadHandlers = this._handlerMap[eventName];
+                if (!hadHandlers) {
+                    return;
+                }
+                var fun;
+                for (var index = 0; index < hadHandlers.length; index++) {
+                    // 检查是不是监听的实例
+                    if (obj != hadHandlers[index][3]) {
+                        continue;
+                    }
+                    // 遍历回调列表
+                    fun = hadHandlers[index][2];
+                    try {
+                        fun.apply(hadHandlers[index][1], data);
+                        // if (!data) {
+                        // 	fun.apply(hadHandlers[index][1]);
+                        // }
+                        // else {
+                        // 	fun.apply(hadHandlers[index][1], [data]);
+                        // }
+                    }
+                    catch (error) {
+                        console.log("error when dispatchEvent, EventName:" + eventName + ",Error:" + error);
+                        // Utils.stackTrace();
+                        console.log(error.stack);
+                    }
+                }
+            };
+            /**
+             * 服务名
+             */
+            EventService.serviceName = "rigger.service.EventService";
+            return EventService;
+        }(service.AbsService));
+        service.EventService = EventService;
+    })(service = rigger.service || (rigger.service = {}));
+})(rigger || (rigger = {}));
 
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+/**
+* 核心服务
+*/
+var rigger;
+(function (rigger) {
+    var service;
+    (function (service) {
+        var KernelService = /** @class */ (function (_super) {
+            __extends(KernelService, _super);
+            function KernelService() {
+                return _super.call(this) || this;
+            }
+            /**
+             * 服务启动时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             *
+             * @example resultHandler.runWith([true]) 启动成功
+             */
+            KernelService.prototype.onStart = function (resultHandler, startupArgs) {
+                resultHandler.success();
+            };
+            /**
+             * 停止服务时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 服务停用成功
+             */
+            KernelService.prototype.onStop = function (resultHandler) {
+                resultHandler.success();
+            };
+            /**
+             * 启动服务时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 重启
+             */
+            KernelService.prototype.onReStart = function (resultHandler) {
+                resultHandler.success();
+            };
+            /**
+             * 服务名
+             */
+            KernelService.serviceName = "rigger.service.KernelService";
+            return KernelService;
+        }(service.AbsService));
+        service.KernelService = KernelService;
+    })(service = rigger.service || (rigger.service = {}));
+})(rigger || (rigger = {}));
 
-
-
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+/**
+* name
+*/
+var rigger;
+(function (rigger) {
+    var service;
+    (function (service) {
+        var PoolService = /** @class */ (function (_super) {
+            __extends(PoolService, _super);
+            function PoolService() {
+                var _this = _super.call(this) || this;
+                _this.objectPool = {};
+                _this.objectPool = {};
+                return _this;
+            }
+            Object.defineProperty(PoolService, "instance", {
+                get: function () {
+                    return PoolService.getRunningService(PoolService.serviceName);
+                },
+                enumerable: true,
+                configurable: true
+            });
+            /**
+             * 根据对象类型标识字符，获取对象池。
+             * @param sign 对象类型标识字符。
+             * @return 对象池。
+             */
+            PoolService.getPoolBySign = function (sign) {
+                return PoolService.instance.getPoolBySign(sign);
+            };
+            /**
+             * 清除对象池的对象。
+             * @param sign 对象类型标识字符。
+             */
+            PoolService.clearBySign = function (sign) {
+                PoolService.instance.clearBySign(sign);
+            };
+            /**
+             * 将对象放到对应类型标识的对象池中。
+             * @param sign 对象类型标识字符。
+             * @param item 对象。
+             */
+            PoolService.recover = function (sign, item) {
+                PoolService.instance.recover(sign, item);
+            };
+            /**
+             * <p>根据传入的对象类型标识字符，获取对象池中此类型标识的一个对象实例。</p>
+             * <p>当对象池中无此类型标识的对象时，则根据传入的类型，创建一个新的对象返回。</p>
+             * @param sign 对象类型标识字符。
+             * @param cls 用于创建该类型对象的类。
+             * @return 此类型标识的一个对象。
+             */
+            PoolService.getItemByClass = function (sign, cls) {
+                return PoolService.instance.getItemByClass(sign, cls);
+            };
+            /**
+             * <p>根据传入的对象类型标识字符，获取对象池中此类型标识的一个对象实例。</p>
+             * <p>当对象池中无此类型标识的对象时，则使用传入的创建此类型对象的函数，新建一个对象返回。</p>
+             * @param sign 对象类型标识字符。
+             * @param createFun 用于创建该类型对象的方法。
+             * @return 此类型标识的一个对象。
+             */
+            PoolService.getItemByCreateFun = function (sign, createFun) {
+                return PoolService.instance.getItemByCreateFun(sign, createFun);
+            };
+            /**
+             * 根据传入的对象类型标识字符，获取对象池中已存储的此类型的一个对象，如果对象池中无此类型的对象，则返回 null 。
+             * @param sign 对象类型标识字符。
+             * @return 对象池中此类型的一个对象，如果对象池中无此类型的对象，则返回 null 。
+             */
+            PoolService.getItem = function (sign) {
+                return PoolService.instance.getItem(sign);
+            };
+            /**
+             * 根据对象类型标识字符，获取对象池。
+             * @param sign 对象类型标识字符。
+             * @return 对象池。
+             */
+            PoolService.prototype.getPoolBySign = function (sign) {
+                var arr = this.objectPool[sign];
+                if (!arr) {
+                    this.objectPool[sign] = arr = [];
+                }
+                return arr;
+            };
+            /**
+             * 清除对象池的对象。
+             * @param sign 对象类型标识字符。
+             */
+            PoolService.prototype.clearBySign = function (sign) {
+                delete this.objectPool[sign];
+            };
+            /**
+             * 将对象放到对应类型标识的对象池中。
+             * @param sign 对象类型标识字符。
+             * @param item 对象。
+             */
+            PoolService.prototype.recover = function (sign, item) {
+                var old = this.getPoolBySign(sign);
+                old.push(item);
+            };
+            /**
+             * <p>根据传入的对象类型标识字符，获取对象池中此类型标识的一个对象实例。</p>
+             * <p>当对象池中无此类型标识的对象时，则根据传入的类型，创建一个新的对象返回。</p>
+             * @param sign 对象类型标识字符。
+             * @param cls 用于创建该类型对象的类。
+             * @return 此类型标识的一个对象。
+             */
+            PoolService.prototype.getItemByClass = function (sign, cls) {
+                var obj = this.getItem(sign);
+                if (obj)
+                    return obj;
+                return new cls();
+            };
+            /**
+             * <p>根据传入的对象类型标识字符，获取对象池中此类型标识的一个对象实例。</p>
+             * <p>当对象池中无此类型标识的对象时，则使用传入的创建此类型对象的函数，新建一个对象返回。</p>
+             * @param sign 对象类型标识字符。
+             * @param createFun 用于创建该类型对象的方法。
+             * @return 此类型标识的一个对象。
+             */
+            PoolService.prototype.getItemByCreateFun = function (sign, createFun) {
+                var obj = this.getItem(sign);
+                if (obj)
+                    return obj;
+                return createFun();
+            };
+            /**
+             * 根据传入的对象类型标识字符，获取对象池中已存储的此类型的一个对象，如果对象池中无此类型的对象，则返回 null 。
+             * @param sign 对象类型标识字符。
+             * @return 对象池中此类型的一个对象，如果对象池中无此类型的对象，则返回 null 。
+             */
+            PoolService.prototype.getItem = function (sign) {
+                var pool = this.getPoolBySign(sign);
+                if (pool.length <= 0)
+                    return null;
+                return pool.pop();
+            };
+            /**
+             * 服务被唤醒时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @param {any[]} startupArgs 启动参数
+             *
+             * @example resultHandler.runWith([true]) 启动成功
+             */
+            PoolService.prototype.onStart = function (resultHandler, startupArgs) {
+                this.objectPool = {};
+                resultHandler.success();
+            };
+            /**
+             * 停止服务时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 服务停用成功
+             */
+            PoolService.prototype.onStop = function (resultHandler) {
+                this.objectPool = null;
+                resultHandler.success();
+            };
+            /**
+             * 启动服务时的回调
+             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
+             * @example resultHandler.runWith([true]) 重启
+             */
+            PoolService.prototype.onReStart = function (resultHandler) {
+                this.objectPool = {};
+                resultHandler.success();
+            };
+            /**
+             * 服务名
+             */
+            PoolService.serviceName = "rigger.service.PoolService";
+            return PoolService;
+        }(service.AbsService));
+        service.PoolService = PoolService;
+    })(service = rigger.service || (rigger.service = {}));
+})(rigger || (rigger = {}));
 
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -1988,398 +2436,5 @@ var rigger;
             return ConfigService;
         }(service.AbsService));
         service.ConfigService = ConfigService;
-    })(service = rigger.service || (rigger.service = {}));
-})(rigger || (rigger = {}));
-
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-/**
- * 事件服务
- */
-var rigger;
-(function (rigger) {
-    var service;
-    (function (service) {
-        var EventService = /** @class */ (function (_super) {
-            __extends(EventService, _super);
-            function EventService() {
-                var _this = _super.call(this) || this;
-                _this.HANDLER_FIELD_TYPE_CALLER = 1;
-                _this.HANDLER_FIELD_TYPE_HANDLER = 2;
-                _this.HANDLER_FIELD_TYPE_INSTANCE = 3;
-                _this._handlerMap = {};
-                return _this;
-            }
-            Object.defineProperty(EventService, "instance", {
-                get: function () {
-                    return EventService.getRunningService(EventService.serviceName);
-                },
-                enumerable: true,
-                configurable: true
-            });
-            /**
-             * 服务启动时的回调
-             * @param {RiggerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             *
-             * @example resultHandler.runWith([true]) 启动成功
-             */
-            EventService.prototype.onStart = function (resultHandler, startupArgs) {
-                resultHandler.success();
-            };
-            /**
-             * 停止服务时的回调
-             * @param {RiggerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 服务停用成功
-             */
-            EventService.prototype.onStop = function (resultHandler) {
-                this._handlerMap = null;
-                resultHandler.success();
-            };
-            /**
-             * 启动服务时的回调
-             * @param {RiggerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 重启
-             */
-            EventService.prototype.onReStart = function (resultHandler) {
-                resultHandler.success();
-            };
-            // public addProtocolListener(protocolId: number, caller: any, handler: GameEventHandler) {
-            // 	this.addEventListener(protocolId, NetworkManager.instance, caller, handler);
-            // }
-            // public removeProtocolListener(protocolId: number, caller: any, handler: GameEventHandler) {
-            // 	this.removeEventListener(protocolId, NetworkManager.instance, caller, handler);
-            // }
-            /**
-             * 注册事件监听
-             */
-            EventService.prototype.addEventListener = function (eventName, obj, caller, handler) {
-                if (obj === void 0) { obj = null; }
-                try {
-                    var oldHandlers = this._handlerMap[eventName];
-                    if (oldHandlers) {
-                        oldHandlers.push({ 1: caller, 2: handler, 3: obj });
-                    }
-                    else {
-                        this._handlerMap[eventName] = [{ 1: caller, 2: handler, 3: obj }];
-                    }
-                }
-                catch (error) {
-                    console.log("error when add event listener:" + error);
-                    console.log(error.stack);
-                }
-            };
-            /**
-             * 移除事件监听
-             */
-            EventService.prototype.removeEventListener = function (eventName, obj, caller, handler) {
-                var hadHandlers = this._handlerMap[eventName];
-                var newHandlers = [];
-                if (hadHandlers) {
-                    for (var index = 0; index < hadHandlers.length; index++) {
-                        if (obj != hadHandlers[index][3] || caller != hadHandlers[index][1] || handler != hadHandlers[index][2]) {
-                            newHandlers.push(hadHandlers[index]);
-                        }
-                    }
-                    this._handlerMap[eventName] = newHandlers;
-                }
-            };
-            /**
-             * 派发事件注册了的事件将被触发
-             */
-            EventService.prototype.dispatchEvent = function (eventName, obj) {
-                if (obj === void 0) { obj = null; }
-                var data = [];
-                for (var _i = 2; _i < arguments.length; _i++) {
-                    data[_i - 2] = arguments[_i];
-                }
-                var hadHandlers = this._handlerMap[eventName];
-                if (!hadHandlers) {
-                    return;
-                }
-                var fun;
-                for (var index = 0; index < hadHandlers.length; index++) {
-                    // 检查是不是监听的实例
-                    if (obj != hadHandlers[index][3]) {
-                        continue;
-                    }
-                    // 遍历回调列表
-                    fun = hadHandlers[index][2];
-                    try {
-                        fun.apply(hadHandlers[index][1], data);
-                        // if (!data) {
-                        // 	fun.apply(hadHandlers[index][1]);
-                        // }
-                        // else {
-                        // 	fun.apply(hadHandlers[index][1], [data]);
-                        // }
-                    }
-                    catch (error) {
-                        console.log("error when dispatchEvent, EventName:" + eventName + ",Error:" + error);
-                        // Utils.stackTrace();
-                        console.log(error.stack);
-                    }
-                }
-            };
-            /**
-             * 服务名
-             */
-            EventService.serviceName = "rigger.service.EventService";
-            return EventService;
-        }(service.AbsService));
-        service.EventService = EventService;
-    })(service = rigger.service || (rigger.service = {}));
-})(rigger || (rigger = {}));
-
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-/**
-* name
-*/
-var rigger;
-(function (rigger) {
-    var service;
-    (function (service) {
-        var PoolService = /** @class */ (function (_super) {
-            __extends(PoolService, _super);
-            function PoolService() {
-                var _this = _super.call(this) || this;
-                _this.objectPool = {};
-                _this.objectPool = {};
-                return _this;
-            }
-            Object.defineProperty(PoolService, "instance", {
-                get: function () {
-                    return PoolService.getRunningService(PoolService.serviceName);
-                },
-                enumerable: true,
-                configurable: true
-            });
-            /**
-             * 根据对象类型标识字符，获取对象池。
-             * @param sign 对象类型标识字符。
-             * @return 对象池。
-             */
-            PoolService.getPoolBySign = function (sign) {
-                return PoolService.instance.getPoolBySign(sign);
-            };
-            /**
-             * 清除对象池的对象。
-             * @param sign 对象类型标识字符。
-             */
-            PoolService.clearBySign = function (sign) {
-                PoolService.instance.clearBySign(sign);
-            };
-            /**
-             * 将对象放到对应类型标识的对象池中。
-             * @param sign 对象类型标识字符。
-             * @param item 对象。
-             */
-            PoolService.recover = function (sign, item) {
-                PoolService.instance.recover(sign, item);
-            };
-            /**
-             * <p>根据传入的对象类型标识字符，获取对象池中此类型标识的一个对象实例。</p>
-             * <p>当对象池中无此类型标识的对象时，则根据传入的类型，创建一个新的对象返回。</p>
-             * @param sign 对象类型标识字符。
-             * @param cls 用于创建该类型对象的类。
-             * @return 此类型标识的一个对象。
-             */
-            PoolService.getItemByClass = function (sign, cls) {
-                return PoolService.instance.getItemByClass(sign, cls);
-            };
-            /**
-             * <p>根据传入的对象类型标识字符，获取对象池中此类型标识的一个对象实例。</p>
-             * <p>当对象池中无此类型标识的对象时，则使用传入的创建此类型对象的函数，新建一个对象返回。</p>
-             * @param sign 对象类型标识字符。
-             * @param createFun 用于创建该类型对象的方法。
-             * @return 此类型标识的一个对象。
-             */
-            PoolService.getItemByCreateFun = function (sign, createFun) {
-                return PoolService.instance.getItemByCreateFun(sign, createFun);
-            };
-            /**
-             * 根据传入的对象类型标识字符，获取对象池中已存储的此类型的一个对象，如果对象池中无此类型的对象，则返回 null 。
-             * @param sign 对象类型标识字符。
-             * @return 对象池中此类型的一个对象，如果对象池中无此类型的对象，则返回 null 。
-             */
-            PoolService.getItem = function (sign) {
-                return PoolService.instance.getItem(sign);
-            };
-            /**
-             * 根据对象类型标识字符，获取对象池。
-             * @param sign 对象类型标识字符。
-             * @return 对象池。
-             */
-            PoolService.prototype.getPoolBySign = function (sign) {
-                var arr = this.objectPool[sign];
-                if (!arr) {
-                    this.objectPool[sign] = arr = [];
-                }
-                return arr;
-            };
-            /**
-             * 清除对象池的对象。
-             * @param sign 对象类型标识字符。
-             */
-            PoolService.prototype.clearBySign = function (sign) {
-                delete this.objectPool[sign];
-            };
-            /**
-             * 将对象放到对应类型标识的对象池中。
-             * @param sign 对象类型标识字符。
-             * @param item 对象。
-             */
-            PoolService.prototype.recover = function (sign, item) {
-                var old = this.getPoolBySign(sign);
-                old.push(item);
-            };
-            /**
-             * <p>根据传入的对象类型标识字符，获取对象池中此类型标识的一个对象实例。</p>
-             * <p>当对象池中无此类型标识的对象时，则根据传入的类型，创建一个新的对象返回。</p>
-             * @param sign 对象类型标识字符。
-             * @param cls 用于创建该类型对象的类。
-             * @return 此类型标识的一个对象。
-             */
-            PoolService.prototype.getItemByClass = function (sign, cls) {
-                var obj = this.getItem(sign);
-                if (obj)
-                    return obj;
-                return new cls();
-            };
-            /**
-             * <p>根据传入的对象类型标识字符，获取对象池中此类型标识的一个对象实例。</p>
-             * <p>当对象池中无此类型标识的对象时，则使用传入的创建此类型对象的函数，新建一个对象返回。</p>
-             * @param sign 对象类型标识字符。
-             * @param createFun 用于创建该类型对象的方法。
-             * @return 此类型标识的一个对象。
-             */
-            PoolService.prototype.getItemByCreateFun = function (sign, createFun) {
-                var obj = this.getItem(sign);
-                if (obj)
-                    return obj;
-                return createFun();
-            };
-            /**
-             * 根据传入的对象类型标识字符，获取对象池中已存储的此类型的一个对象，如果对象池中无此类型的对象，则返回 null 。
-             * @param sign 对象类型标识字符。
-             * @return 对象池中此类型的一个对象，如果对象池中无此类型的对象，则返回 null 。
-             */
-            PoolService.prototype.getItem = function (sign) {
-                var pool = this.getPoolBySign(sign);
-                if (pool.length <= 0)
-                    return null;
-                return pool.pop();
-            };
-            /**
-             * 服务被唤醒时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @param {any[]} startupArgs 启动参数
-             *
-             * @example resultHandler.runWith([true]) 启动成功
-             */
-            PoolService.prototype.onStart = function (resultHandler, startupArgs) {
-                this.objectPool = {};
-                resultHandler.success();
-            };
-            /**
-             * 停止服务时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 服务停用成功
-             */
-            PoolService.prototype.onStop = function (resultHandler) {
-                this.objectPool = null;
-                resultHandler.success();
-            };
-            /**
-             * 启动服务时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 重启
-             */
-            PoolService.prototype.onReStart = function (resultHandler) {
-                this.objectPool = {};
-                resultHandler.success();
-            };
-            /**
-             * 服务名
-             */
-            PoolService.serviceName = "rigger.service.PoolService";
-            return PoolService;
-        }(service.AbsService));
-        service.PoolService = PoolService;
-    })(service = rigger.service || (rigger.service = {}));
-})(rigger || (rigger = {}));
-
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-/**
-* 核心服务
-*/
-var rigger;
-(function (rigger) {
-    var service;
-    (function (service) {
-        var KernelService = /** @class */ (function (_super) {
-            __extends(KernelService, _super);
-            function KernelService() {
-                return _super.call(this) || this;
-            }
-            /**
-             * 服务启动时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @param {any[]} startupArgs 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             *
-             * @example resultHandler.runWith([true]) 启动成功
-             */
-            KernelService.prototype.onStart = function (resultHandler, startupArgs) {
-                resultHandler.success();
-            };
-            /**
-             * 停止服务时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务启动成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 服务停用成功
-             */
-            KernelService.prototype.onStop = function (resultHandler) {
-                resultHandler.success();
-            };
-            /**
-             * 启动服务时的回调
-             * @param {ServerHandler} resultHandler 由服务启动者传递的一个回调句柄，当服务重启成功时，服务提供者应该以"true"参数回调，否则以"false"参数回调
-             * @example resultHandler.runWith([true]) 重启
-             */
-            KernelService.prototype.onReStart = function (resultHandler) {
-                resultHandler.success();
-            };
-            /**
-             * 服务名
-             */
-            KernelService.serviceName = "rigger.service.KernelService";
-            return KernelService;
-        }(service.AbsService));
-        service.KernelService = KernelService;
     })(service = rigger.service || (rigger.service = {}));
 })(rigger || (rigger = {}));

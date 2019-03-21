@@ -21,6 +21,14 @@ declare module rigger {
         protected static mInstance: BaseApplication;
         static replacedServiceMap: {};
         /**
+         * 服务全名与其定义的映射
+         */
+        static serviceFullNameDefinitionMap: {};
+        /**
+         * 插件命名及其定义的映射
+         */
+        static pluginFullNameDefinitionMap: {};
+        /**
          *
          * @param resultHandler
          * @param config 应用配置
@@ -95,6 +103,7 @@ declare module rigger {
         onAllServicesReady(resultHandler: rigger.RiggerHandler): void;
         private newConfigServiceName;
         private makeServiceClass;
+        private doMakeServiceClass;
         /**
          * 获取真正的服务名(可以将服务名转换成被替换后的服务名)
          * @param serviceName

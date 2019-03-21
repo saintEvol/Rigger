@@ -6,6 +6,10 @@ declare module rigger {
     abstract class AbsServicePlugin implements IPlugin {
         constructor();
         /**
+         * 插件名（全名，只有当具有此字段时才能进行注册)
+         */
+        static pluginName?: string;
+        /**
          * 开始插件（添加插件时调用)
          */
         start(resultHandler: RiggerHandler, startupArgs: any): void;
