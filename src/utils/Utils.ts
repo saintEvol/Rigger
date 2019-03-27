@@ -162,8 +162,9 @@ module rigger.utils {
 
         /**
          * 判断是不是一个有效的资源url对象
+         * 
          */
-        public static isAssetsUrlObject(url: Object): url is { url: string, type: string }  {
+        public static isAssetsUrlObject(url: Object): url is { url: string, type: any }  {
             return url.hasOwnProperty("url") && url.hasOwnProperty("type");
             // return url["url"] && url["type"];
         }

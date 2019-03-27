@@ -66,7 +66,7 @@ declare module rigger.utils {
          */
         static isAssetsUrlObject(url: Object): url is {
             url: string;
-            type: string;
+            type: any;
         };
         /**
          * 从数组中获取ID为指定值的对象
