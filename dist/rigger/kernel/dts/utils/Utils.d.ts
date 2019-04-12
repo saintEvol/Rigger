@@ -5,6 +5,39 @@ declare module rigger.utils {
     class Utils {
         constructor();
         /**
+         * 截取数字的整数部分，直接丢弃其小数部分
+         * @param v
+         */
+        static trunc(v: number): number;
+        /**
+         * 将一个64位整型转换成一个int型数组(高低位分离)
+         * @public
+         * @static
+         * @method resoleInt64
+         * @param {number} int64 需要转换的64位整型
+         * @return {number[]} 一个包含两个32位整型的数组
+         */
+        static resoleInt64(int64: number): number[];
+        /**
+         * 将一个int数据组(高低位)转成一个long型
+         * @public
+         * @static
+         * @method combineInt64
+         * @param {number[]} ints 一个包含两个32位整型的数组
+         *
+         */
+        static combineInt64(ints: number[]): number;
+        static transferArrayBuffer(oldBuffer: ArrayBuffer, newByteLength: number): ArrayBuffer;
+        /**
+         * 复制ArrayBuffer
+         * @param source
+         * @param sourceStartByte
+         * @param dest
+         * @param destStartByte
+         * @param copyBytes
+         */
+        static copyArrayBuffer(source: ArrayBuffer, sourceStartByte: number, dest: ArrayBuffer, destStartByte: number, copyBytes: number): void;
+        /**
          * 从数组中移除某一个元素
          * @public
          * @static
@@ -55,7 +88,7 @@ declare module rigger.utils {
          * 判断值是否是一个数字(而不管是否可以转化成一个数字)
          * @param {any} value
          */
-        static isNumber(value: any): boolean;
+        static isNumber(value: any): value is number;
         /**
          * 判断一人数字是否是整数
          * @param {number} num 需要进行判断的数字
@@ -63,6 +96,7 @@ declare module rigger.utils {
         static isInteger(num: number): boolean;
         /**
          * 判断是不是一个有效的资源url对象
+         *
          */
         static isAssetsUrlObject(url: Object): url is {
             url: string;

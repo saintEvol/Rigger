@@ -970,6 +970,336 @@ var rigger;
     rigger.RiggerHandler = RiggerHandler;
 })(rigger || (rigger = {}));
 
+var rigger;
+(function (rigger) {
+    var utils;
+    (function (utils) {
+        var Byte = /** @class */ (function () {
+            function Byte(byteLen) {
+                this.dataView = null;
+                /**
+                 * 当前位置(字节)
+                 */
+                this.pos = 0;
+                this.littleEndian = false;
+                if (rigger.utils.Utils.isNullOrUndefined(byteLen)) {
+                    byteLen = Byte.defaultLenth;
+                }
+                this.init(byteLen);
+            }
+            Byte.prototype.clear = function () {
+                this.dataView = null;
+                this.pos = 0;
+            };
+            Object.defineProperty(Byte.prototype, "byteLength", {
+                /**
+                 * 有效内容的字节长度
+                 */
+                // public contentLength: number = 0;
+                /**
+                 * 占用内存的字节长度
+                 */
+                get: function () {
+                    if (this.dataView)
+                        return this.dataView.byteLength;
+                    return 0;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            Object.defineProperty(Byte.prototype, "buffer", {
+                get: function () {
+                    if (!this.dataView)
+                        return null;
+                    return this.dataView.buffer;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            /**
+             * 从字节流当前位置读取8位整型值，此方法不会导致位置移动
+             */
+            Byte.prototype.getInt8 = function () {
+                return this.dataView.getInt8(this.pos);
+            };
+            /**
+             * 从字节流当前位置读取16位整型值，此方法不会导致位置移动
+             */
+            Byte.prototype.getInt16 = function () {
+                return this.dataView.getInt16(this.pos, this.littleEndian);
+            };
+            /**
+             * 从字节流当前位置读取32位整型值，此方法不会导致位置移动
+             */
+            Byte.prototype.getInt32 = function () {
+                return this.dataView.getInt32(this.pos, this.littleEndian);
+            };
+            /**
+             * 从字节流当前位置读取64位整型值，此方法不会导致位置移动
+             */
+            Byte.prototype.getInt64 = function () {
+                var n1 = this.readInt32();
+                var n2 = this.readInt32();
+                this.pos -= 8;
+                return rigger.utils.Utils.combineInt64([n1, n2]);
+            };
+            /**
+             * 从字节流当前位置读取8位无符号整型值，此方法不会导致位置移动
+             */
+            Byte.prototype.getUint8 = function () {
+                return this.dataView.getUint8(this.pos);
+            };
+            /**
+             * 从字节流当前位置读取16位无符号整型值，此方法不会导致位置移动
+             */
+            Byte.prototype.getUint16 = function () {
+                return this.dataView.getUint16(this.pos, this.littleEndian);
+            };
+            /**
+             * 从字节流当前位置读取32位无符号整型值，此方法不会导致位置移动
+             */
+            Byte.prototype.getUint32 = function () {
+                return this.dataView.getUint32(this.pos, this.littleEndian);
+            };
+            /**
+             * 从字节流当前位置读取64位无符号整型值，此方法不会导致位置移动
+             */
+            Byte.prototype.getUint64 = function () {
+                var n1 = this.readUint32();
+                var n2 = this.readUint32();
+                this.pos -= 8;
+                return rigger.utils.Utils.combineInt64([n1, n2]);
+            };
+            /**
+             * 从字节流当前位置读取8位整型值，并使当前位置向后移动8位
+             */
+            Byte.prototype.readInt8 = function () {
+                var ret = this.getInt8();
+                this.pos += 1;
+                return ret;
+            };
+            /**
+             * 从字节流当前位置读取16位整型值，并使当前位置向后移动16位
+             */
+            Byte.prototype.readInt16 = function () {
+                var ret = this.getInt16();
+                this.pos += 2;
+                return ret;
+            };
+            /**
+             * 从字节流当前位置读取32位整型值，并使当前位置向后移动32位
+             */
+            Byte.prototype.readInt32 = function () {
+                var ret = this.getInt32();
+                this.pos += 4;
+                return ret;
+            };
+            /**
+             * 从字节流当前位置读取64位整型值，并使当前位置向后移动64位
+             */
+            Byte.prototype.readInt64 = function () {
+                var ret = this.getInt64();
+                this.pos += 8;
+                return ret;
+            };
+            /**
+             * 从字节流当前位置读取8位无符号整型值，并使当前位置向后移动8位
+             */
+            Byte.prototype.readUint8 = function () {
+                var ret = this.getUint8();
+                this.pos += 1;
+                return ret;
+            };
+            /**
+             * 从字节流当前位置读取16位无符号整型值，并使当前位置向后移动16位
+             */
+            Byte.prototype.readUint16 = function () {
+                var ret = this.getUint16();
+                this.pos += 2;
+                return ret;
+            };
+            /**
+             * 从字节流当前位置读取32位无符号整型值，并使当前位置向后移动32位
+             */
+            Byte.prototype.readUint32 = function () {
+                var ret = this.getUint32();
+                this.pos += 4;
+                return ret;
+            };
+            /**
+             * 从字节流当前位置读取64位无符号整型值，并使当前位置向后移动32位
+             */
+            Byte.prototype.readUint64 = function () {
+                var ret = this.getUint64();
+                this.pos += 8;
+                return ret;
+            };
+            /**
+             * 写入一个8位的有符号值，并且使位置向后移动8位
+             * @param v 写入的值
+             */
+            Byte.prototype.writeInt8 = function (v) {
+                this.ensureBuffer(1);
+                this.dataView.setInt8(this.pos, v);
+                this.pos += 1;
+                return this;
+            };
+            /**
+             * 写入一个16位的有符号值，并且使位置向后移动16位
+             * @param v 写入的值
+             */
+            Byte.prototype.writeInt16 = function (v) {
+                this.ensureBuffer(2);
+                this.dataView.setInt16(this.pos, v);
+                this.pos += 2;
+                return this;
+            };
+            /**
+             * 写入一个32位的有符号值，并且使位置向后移动32位
+             * @param v 写入的值
+             */
+            Byte.prototype.writeInt32 = function (v) {
+                this.ensureBuffer(4);
+                this.dataView.setInt32(this.pos, v);
+                this.pos += 4;
+                return this;
+            };
+            /**
+             * 写入一个64位的有符号值，并且使位置向后移动64位
+             * @param v 写入的值
+             */
+            Byte.prototype.writeInt64 = function (v) {
+                this.ensureBuffer(8);
+                // 将一个数字拆成2个数字
+                var arr = rigger.utils.Utils.resoleInt64(v);
+                // 将其作为两个32位有符号整型写入
+                this.writeInt32(arr[0]).writeInt32(arr[1]);
+                this.pos += 8;
+                return this;
+            };
+            /**
+             * 写入一个8位的无符号值，并且使位置向后移动8位
+             * @param v 写入的值
+             */
+            Byte.prototype.writeUint8 = function (v) {
+                this.ensureBuffer(1);
+                this.dataView.setUint8(this.pos, v);
+                this.pos += 1;
+                return this;
+            };
+            /**
+             * 写入一个16位的无符号值，并且使位置向后移动16位
+             * @param v 写入的值
+             */
+            Byte.prototype.writeUint16 = function (v) {
+                this.ensureBuffer(2);
+                this.dataView.setUint16(this.pos, v);
+                this.pos += 2;
+                return this;
+            };
+            /**
+             * 写入一个32位的无符号值，并且使位置向后移动32位
+             * @param v 写入的值
+             */
+            Byte.prototype.writeUint32 = function (v) {
+                this.ensureBuffer(4);
+                this.dataView.setUint32(this.pos, v);
+                this.pos += 4;
+                return this;
+            };
+            /**
+             * 写入一个64位的无符号值，并且使位置向后移动64位
+             * @param v 写入的值
+             */
+            Byte.prototype.writeUint64 = function (v) {
+                this.ensureBuffer(8);
+                // 将一个数字拆成2个数字
+                var arr = rigger.utils.Utils.resoleInt64(v);
+                // 将其作为两个32位无符号整型写入
+                this.writeUint32(arr[0]).writeUint32(arr[1]);
+                this.pos += 8;
+                return this;
+            };
+            Byte.prototype.writeFloat32 = function (v) {
+                this.ensureBuffer(4);
+                this.dataView.setFloat32(this.pos, v);
+                this.pos += 4;
+                return this;
+            };
+            Byte.prototype.writeFloat64 = function (v) {
+                this.ensureBuffer(8);
+                this.dataView.setFloat64(this.pos, v);
+                this.pos += 8;
+                return this;
+            };
+            /**
+             * <p>将指定 arraybuffer 对象中的以 offset 为起始偏移量， length 为长度的字节序列写入字节流。</p>
+             * <p>如果省略 length 参数，则使用默认长度 0，该方法将从 offset 开始写入整个缓冲区；如果还省略了 offset 参数，则写入整个缓冲区。</p>
+             * <p>如果 offset 或 length 小于0，本函数将抛出异常。</p>
+             * $NEXTBIG 由于没有判断length和arraybuffer的合法性，当开发者填写了错误的length值时，会导致写入多余的空白数据甚至内存溢出，为了避免影响开发者正在使用此方法的功能，下个重大版本会修复这些问题。
+             * @param	arraybuffer	需要写入的 Arraybuffer 对象。
+             * @param	offset		Arraybuffer 对象的索引的偏移量（以字节为单位）
+             * @param	length		从 Arraybuffer 对象写入到 Byte 对象的长度（以字节为单位）
+             */
+            Byte.prototype.writeArrayBuffer = function (arraybuffer, offset, length) {
+                if (offset === void 0) { offset = 0; }
+                var leftBytes = rigger.utils.Utils.isNullOrUndefined(length) ? arraybuffer.byteLength - offset : length;
+                if (ArrayBuffer.isView(arraybuffer)) {
+                    arraybuffer = arraybuffer.buffer;
+                }
+                this.ensureBuffer(leftBytes);
+                rigger.utils.Utils.copyArrayBuffer(arraybuffer, offset, this.dataView.buffer, this.pos, leftBytes);
+                return this;
+            };
+            /**
+             * 将字节流重置为指定长度，重置后，所有内容清空
+             * @param byteLen
+             */
+            // public reset(byteLen?: number): void {
+            // 	if (rigger.utils.Utils.isNullOrUndefined(byteLen)) byteLen = Byte.defaultLenth;
+            // 	if (!this.dataView) {
+            // 		this.init(byteLen)
+            // 	}
+            // 	else{
+            // 		this.dataView = new DataView(this.dataView.buffer.slice(0, Math.min(this.dataView.byteLength, byteLen)));
+            // 		// this.contentLength = 0;
+            // 		this.pos = 0;
+            // 	}
+            // }
+            Byte.prototype.ensureBuffer = function (needByteLen) {
+                if (!this.dataView) {
+                    this.init(needByteLen);
+                }
+                else {
+                    // let pos: number = this.dataView.byteOffset;
+                    var has = this.byteLength - this.pos;
+                    if (has < needByteLen) {
+                        // let temp: DataView = new DataView(new ArrayBuffer(this.byteLength + needByteLen - has));
+                        // 扩展缓冲
+                        this.dataView =
+                            new DataView(rigger.utils.Utils.transferArrayBuffer(this.dataView.buffer, this.byteLength + needByteLen - has));
+                    }
+                }
+            };
+            Byte.prototype.init = function (byteLenOrBuffer) {
+                if (rigger.utils.Utils.isNumber(byteLenOrBuffer)) {
+                    this.dataView = new DataView(new ArrayBuffer(byteLenOrBuffer));
+                }
+                else {
+                    this.dataView = new DataView(byteLenOrBuffer);
+                }
+                this.pos = 0;
+            };
+            /**
+             * 默认长度
+             */
+            Byte.defaultLenth = 0;
+            return Byte;
+        }());
+        utils.Byte = Byte;
+    })(utils = rigger.utils || (rigger.utils = {}));
+})(rigger || (rigger = {}));
+
 /**
  * Decorator
  */
@@ -1192,6 +1522,104 @@ var rigger;
             function Utils() {
             }
             /**
+             * 截取数字的整数部分，直接丢弃其小数部分
+             * @param v
+             */
+            Utils.trunc = function (v) {
+                if (Math.trunc)
+                    return Math.trunc(v);
+                v = +v;
+                return (v - v % 1) || (!isFinite(v) || v === 0 ? v : v < 0 ? -0 : 0);
+            };
+            /**
+             * 将一个64位整型转换成一个int型数组(高低位分离)
+             * @public
+             * @static
+             * @method resoleInt64
+             * @param {number} int64 需要转换的64位整型
+             * @return {number[]} 一个包含两个32位整型的数组
+             */
+            Utils.resoleInt64 = function (int64) {
+                var s = Math.pow(2, 32);
+                var r = int64 % s;
+                var d = (int64 - r) / s;
+                return [d, r];
+            };
+            /**
+             * 将一个int数据组(高低位)转成一个long型
+             * @public
+             * @static
+             * @method combineInt64
+             * @param {number[]} ints 一个包含两个32位整型的数组
+             *
+             */
+            Utils.combineInt64 = function (ints) {
+                var s = Math.pow(2, 32);
+                return ints[0] * s + ints[1];
+            };
+            Utils.transferArrayBuffer = function (oldBuffer, newByteLength) {
+                if (ArrayBuffer.transfer) {
+                    return ArrayBuffer.transfer(oldBuffer, newByteLength);
+                }
+                oldBuffer = Object(oldBuffer);
+                var dest = new ArrayBuffer(newByteLength);
+                // 是否分配内存失败
+                if (!(dest instanceof ArrayBuffer)) {
+                    throw new TypeError("Source and destination must be ArrayBuffer instances");
+                }
+                Utils.copyArrayBuffer(oldBuffer, 0, dest, 0, oldBuffer.byteLength);
+                return dest;
+            };
+            /**
+             * 复制ArrayBuffer
+             * @param source
+             * @param sourceStartByte
+             * @param dest
+             * @param destStartByte
+             * @param copyBytes
+             */
+            Utils.copyArrayBuffer = function (source, sourceStartByte, dest, destStartByte, copyBytes) {
+                if (dest.byteLength - destStartByte >= copyBytes) {
+                    var wordSizes = [8, 4, 2, 1];
+                    var leftBytes = copyBytes;
+                    var ViewClass = Uint8Array;
+                    var wordSize = 1;
+                    for (var i = 0; i < wordSizes.length; ++i) {
+                        wordSize = wordSizes[i];
+                        if (leftBytes >= wordSize) {
+                            switch (wordSize) {
+                                case 8:
+                                    ViewClass = Float64Array;
+                                    break;
+                                case 4:
+                                    ViewClass = Float32Array;
+                                    break;
+                                case 2:
+                                    ViewClass = Uint16Array;
+                                    break;
+                                case 1:
+                                    ViewClass = Uint8Array;
+                                    break;
+                                default:
+                                    ViewClass = Uint8Array;
+                                    break;
+                            }
+                            var viewSource = new ViewClass(source, sourceStartByte, Utils.trunc(leftBytes / wordSize));
+                            var viewDest = new ViewClass(dest, destStartByte, viewSource.length);
+                            for (var i_1 = 0; i_1 < viewSource.length; ++i_1) {
+                                viewDest[i_1] = viewSource[i_1];
+                            }
+                            leftBytes -= viewSource.byteLength;
+                            sourceStartByte += viewSource.byteLength;
+                            destStartByte += viewSource.byteLength;
+                        }
+                    }
+                }
+                else {
+                    throw new Error("Dest ArrayBuffer space not enough!");
+                }
+            };
+            /**
              * 从数组中移除某一个元素
              * @public
              * @static
@@ -1321,6 +1749,7 @@ var rigger;
             };
             /**
              * 判断是不是一个有效的资源url对象
+             *
              */
             Utils.isAssetsUrlObject = function (url) {
                 return url.hasOwnProperty("url") && url.hasOwnProperty("type");
