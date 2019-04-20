@@ -323,7 +323,7 @@ module rigger.utils {
             }
             this.ensureBuffer(leftBytes);
             rigger.utils.Utils.copyArrayBuffer(arraybuffer, offset, this.dataView.buffer, this.pos, leftBytes);
-
+            this.pos += leftBytes;
             return this
         }
 

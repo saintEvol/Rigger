@@ -69,24 +69,31 @@ module rigger.utils {
          * @param destStartByte 
          * @param copyBytes 
          */
-        public static copyArrayBuffer(source: ArrayBuffer, sourceStartByte: number, dest: ArrayBuffer, destStartByte: number, copyBytes: number) {
+        public static copyArrayBuffer(source: ArrayBuffer, sourceStartByte: number, dest: ArrayBuffer, destStartByte: number, copyBytes: number, considerTraint: boolean = true) {
             if (dest.byteLength - destStartByte >= copyBytes) {
                 let wordSizes: number[] = [8, 4, 2, 1];
-                let leftBytes:number = copyBytes;
+                let leftBytes: number = copyBytes;
                 let ViewClass: any = Uint8Array;
-                let wordSize:number = 1;
+                let wordSize: number = 1;
                 for (let i: number = 0; i < wordSizes.length; ++i) {
                     wordSize = wordSizes[i];
                     if (leftBytes >= wordSize) {
                         switch (wordSize) {
+                            // 同时要检查对齐
                             case 8:
-                                ViewClass = Float64Array;
+                                if (sourceStartByte % 8 == 0 && destStartByte % 8 == 0) {
+                                    ViewClass = Float64Array
+                                }
                                 break;
                             case 4:
-                                ViewClass = Float32Array;
+                                if (sourceStartByte % 4 == 0 && destStartByte % 4 == 0) {
+                                    ViewClass = Float32Array
+                                }
                                 break;
                             case 2:
-                                ViewClass = Uint16Array;
+                                if (sourceStartByte % 2 == 0 && destStartByte % 2 == 0) {
+                                    ViewClass = Uint16Array
+                                }
                                 break;
                             case 1:
                                 ViewClass = Uint8Array;
@@ -98,7 +105,7 @@ module rigger.utils {
 
                         let viewSource = new ViewClass(source, sourceStartByte, Utils.trunc(leftBytes / wordSize));
                         let viewDest = new ViewClass(dest, destStartByte, viewSource.length);
-                        for( let i:number = 0; i< viewSource.length; ++i){
+                        for (let i: number = 0; i < viewSource.length; ++i) {
                             viewDest[i] = viewSource[i];
                         }
 

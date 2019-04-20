@@ -36,7 +36,7 @@ declare module rigger.utils {
          * @param destStartByte
          * @param copyBytes
          */
-        static copyArrayBuffer(source: ArrayBuffer, sourceStartByte: number, dest: ArrayBuffer, destStartByte: number, copyBytes: number): void;
+        static copyArrayBuffer(source: ArrayBuffer, sourceStartByte: number, dest: ArrayBuffer, destStartByte: number, copyBytes: number, considerTraint?: boolean): void;
         /**
          * 从数组中移除某一个元素
          * @public
