@@ -589,10 +589,11 @@ module rigger.utils {
          * @param	offset		Arraybuffer 对象的索引的偏移量（以字节为单位）
          * @param	length		从 Arraybuffer 对象写入到 Byte 对象的长度（以字节为单位）
          */
-        writeArrayBuffer(arraybuffer: ArrayBuffer, offset: number = 0, length?: number): Byte {
+        writeArrayBuffer(arraybuffer: ArrayBuffer, offset: number = 0, length?:number): Byte {
             // let leftBytes: number = rigger.utils.Utils.isNullOrUndefined(length) ? arraybuffer.byteLength - offset : length;
+            if(utils.Utils.isNullOrUndefined(length) || length == 0) length = arraybuffer.byteLength - offset
             if (offset < 0 || length < 0) throw new Error("writeArrayBuffer error - Out of bounds");
-            if (length == 0) length = arraybuffer.byteLength - offset;
+            // if (length == 0) length = arraybuffer.byteLength - offset;
             this.ensureWrite(this._pos + length);
             let uint8array: Uint8Array = new Uint8Array(arraybuffer);
             this._u8d.set(uint8array.subarray(offset, offset + length), this._pos);

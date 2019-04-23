@@ -1508,10 +1508,11 @@ var rigger;
             Byte.prototype.writeArrayBuffer = function (arraybuffer, offset, length) {
                 if (offset === void 0) { offset = 0; }
                 // let leftBytes: number = rigger.utils.Utils.isNullOrUndefined(length) ? arraybuffer.byteLength - offset : length;
+                if (utils.Utils.isNullOrUndefined(length) || length == 0)
+                    length = arraybuffer.byteLength - offset;
                 if (offset < 0 || length < 0)
                     throw new Error("writeArrayBuffer error - Out of bounds");
-                if (length == 0)
-                    length = arraybuffer.byteLength - offset;
+                // if (length == 0) length = arraybuffer.byteLength - offset;
                 this.ensureWrite(this._pos + length);
                 var uint8array = new Uint8Array(arraybuffer);
                 this._u8d.set(uint8array.subarray(offset, offset + length), this._pos);
