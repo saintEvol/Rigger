@@ -975,21 +975,37 @@ var rigger;
     var utils;
     (function (utils) {
         var Byte = /** @class */ (function () {
-            function Byte(byteLen) {
-                this.dataView = null;
-                /**
-                 * 当前位置(字节)
-                 */
-                this.pos = 0;
+            function Byte(data) {
+                this._dataView = null;
+                this._allocated = 8;
+                this._pos = 0;
+                this._length = 0;
+                this._u8d = null;
                 this.littleEndian = false;
-                if (rigger.utils.Utils.isNullOrUndefined(byteLen)) {
-                    byteLen = Byte.defaultLenth;
+                this._allocated = 8;
+                this._pos = 0;
+                this._length = 0;
+                this.littleEndian = false;
+                if (data) {
+                    this._u8d = new Uint8Array(data);
+                    this._dataView = new DataView(this._u8d.buffer);
+                    this._length = this._dataView.byteLength;
                 }
-                this.init(byteLen);
+                else {
+                    this.resizeBuffer(this._allocated);
+                }
             }
+            Byte.getSystemEndian = function () {
+                if (!Byte.sysEndian) {
+                    var buffer = new ArrayBuffer(2);
+                    new DataView(buffer).setInt16(0, 256, true);
+                    Byte.sysEndian = (new Int16Array(buffer))[0] === 256 ? /*CLASS CONST:laya.utils.Byte.LITTLE_ENDIAN*/ "littleEndian" : /*CLASS CONST:laya.utils.Byte.BIG_ENDIAN*/ "bigEndian";
+                }
+                return Byte.sysEndian;
+            };
             Byte.prototype.clear = function () {
-                this.dataView = null;
-                this.pos = 0;
+                this._pos = 0;
+                this.length = 0;
             };
             Object.defineProperty(Byte.prototype, "byteLength", {
                 /**
@@ -1000,39 +1016,199 @@ var rigger;
                  * 占用内存的字节长度
                  */
                 get: function () {
-                    if (this.dataView)
-                        return this.dataView.byteLength;
-                    return 0;
+                    return this._length;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            Object.defineProperty(Byte.prototype, "pos", {
+                /**
+                 * 当前位置(字节)
+                 */
+                get: function () {
+                    return this._pos;
+                },
+                /**
+                 *
+                 */
+                set: function (value) {
+                    this._pos = value;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            Object.defineProperty(Byte.prototype, "length", {
+                /**
+                 * 长度（字节）
+                 */
+                get: function () {
+                    return this._length;
+                },
+                set: function (len) {
+                    if (this._allocated < len) {
+                        this.resizeBuffer(this._allocated = Math.floor(Math.max(len, this._allocated * 2)));
+                    }
+                    else if (this._allocated > len) {
+                        this.resizeBuffer(this._allocated = len);
+                    }
+                    this._length = len;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            Object.defineProperty(Byte.prototype, "bytesAvailable", {
+                /**
+                 * 可用字节数（从当前位置到终点）
+                 */
+                get: function () {
+                    return this._length - this._pos;
                 },
                 enumerable: true,
                 configurable: true
             });
             Object.defineProperty(Byte.prototype, "buffer", {
+                /**
+                 * 缓冲区
+                 */
                 get: function () {
-                    if (!this.dataView)
-                        return null;
-                    return this.dataView.buffer;
+                    var rstBuffer = this._dataView.buffer;
+                    if (rstBuffer.byteLength == this.length)
+                        return rstBuffer;
+                    return rstBuffer.slice(0, this.length);
+                },
+                enumerable: true,
+                configurable: true
+            });
+            Object.defineProperty(Byte.prototype, "endian", {
+                /**
+                 * 大小端标示
+                 */
+                get: function () {
+                    return this.littleEndian ? "littleEndian" : "bigEndian";
+                },
+                set: function (endianStr) {
+                    this.littleEndian = (endianStr == "littleEndian");
                 },
                 enumerable: true,
                 configurable: true
             });
             /**
+            *<p>常用于解析固定格式的字节流。</p>
+            *<p>先从字节流的当前字节偏移位置处读取一个 <code>Uint16</code> 值，然后以此值为长度，读取此长度的字符串,此方法不会导致位置移动。</p>
+            *@return 读取的字符串。
+            */
+            Byte.prototype.getString = function () {
+                return this.rUTF(this.readUint16());
+            };
+            /**
+            *读取 <code>len</code> 参数指定的长度的字符串。
+            *@param len 要读取的字符串的长度。
+            *@return 指定长度的字符串。
+            */
+            Byte.prototype.readCustomString = function (len) {
+                var v = "", ulen = 0, c = 0, c2 = 0, f = String.fromCharCode;
+                var u = this._u8d, i = 0;
+                while (len > 0) {
+                    c = u[this._pos];
+                    if (c < 0x80) {
+                        v += f(c);
+                        this._pos++;
+                        len--;
+                    }
+                    else {
+                        ulen = c - 0x80;
+                        this._pos++;
+                        len -= ulen;
+                        while (ulen > 0) {
+                            c = u[this._pos++];
+                            c2 = u[this._pos++];
+                            v += f((c2 << 8) | c);
+                            ulen--;
+                        }
+                    }
+                }
+                return v;
+            };
+            /**
+            *从字节流中 <code>start</code> 参数指定的位置开始，读取 <code>len</code> 参数指定的字节数的数据，用于创建一个 <code>Float32Array</code> 对象并返回此对象,此方法不会导致POS发生改变。
+            *@param start 开始位置。
+            *@param len 需要读取的字节长度。如果要读取的长度超过可读取范围，则只返回可读范围内的值。
+            *@return 读取的 Float32Array 对象。
+            */
+            Byte.prototype.getFloat32Array = function (start, len) {
+                var end = start + len;
+                end = (end > this._length) ? this._length : end;
+                var v = new Float32Array(this._dataView.buffer.slice(start, end));
+                return v;
+            };
+            /**
+             *
+             * @param start
+             * @param len
+             */
+            Byte.prototype.getUint8Array = function (start, len) {
+                var end = start + len;
+                end = (end > this._length) ? this._length : end;
+                return new Uint8Array(this._dataView.buffer.slice(start, end));
+            };
+            Byte.prototype.getUint16Array = function (start, len) {
+                var end = start + len;
+                end = (end > this._length) ? this._length : end;
+                return new Uint16Array(this._dataView.buffer.slice(start, end));
+            };
+            Byte.prototype.getInt16Array = function (start, len) {
+                var end = start + len;
+                end = (end > this._length) ? this._length : end;
+                return new Int16Array(this._dataView.buffer.slice(start, end));
+            };
+            /**
+            *从字节流中 <code>start</code> 参数指定的位置开始，读取 <code>len</code> 参数指定的字节数的数据，用于创建一个 <code>Float32Array</code> 对象并返回此对象。
+            *@param start 开始位置。
+            *@param len 需要读取的字节长度。如果要读取的长度超过可读取范围，则只返回可读范围内的值。
+            *@return 读取的 Float32Array 对象。
+            */
+            Byte.prototype.readFloat32Array = function (start, len) {
+                var end = start + len;
+                var ret = this.getFloat32Array(start, len);
+                this._pos = end;
+                return ret;
+            };
+            Byte.prototype.readUint8Array = function (start, len) {
+                var ret = this.getUint8Array(start, len);
+                this._pos = start + len;
+                return ret;
+            };
+            Byte.prototype.readUint16Array = function (start, len) {
+                var ret = this.getUint16Array(start, len);
+                this._pos = start + len;
+                return ret;
+            };
+            Byte.prototype.readInt16Array = function (start, len) {
+                var ret = this.getInt16Array(start, len);
+                this._pos = start + len;
+                return ret;
+            };
+            /**
              * 从字节流当前位置读取8位整型值，此方法不会导致位置移动
              */
             Byte.prototype.getInt8 = function () {
-                return this.dataView.getInt8(this.pos);
+                if (this._pos + 1 > this._length)
+                    throw new Error("getInt8 error - Out of bounds");
+                return this._dataView.getInt8(this.pos);
             };
             /**
              * 从字节流当前位置读取16位整型值，此方法不会导致位置移动
              */
             Byte.prototype.getInt16 = function () {
-                return this.dataView.getInt16(this.pos, this.littleEndian);
+                if (this._pos + 2 > this._length)
+                    throw new Error("getInt16 error - Out of bounds");
+                return this._dataView.getInt16(this.pos, this.littleEndian);
             };
             /**
              * 从字节流当前位置读取32位整型值，此方法不会导致位置移动
              */
             Byte.prototype.getInt32 = function () {
-                return this.dataView.getInt32(this.pos, this.littleEndian);
+                return this._dataView.getInt32(this.pos, this.littleEndian);
             };
             /**
              * 从字节流当前位置读取64位整型值，此方法不会导致位置移动
@@ -1040,26 +1216,40 @@ var rigger;
             Byte.prototype.getInt64 = function () {
                 var n1 = this.readInt32();
                 var n2 = this.readInt32();
-                this.pos -= 8;
+                this._pos -= 8;
                 return rigger.utils.Utils.combineInt64([n1, n2]);
+            };
+            Byte.prototype.getFloat32 = function () {
+                if (this._pos + 4 > this._length)
+                    throw "getFloat32 error - Out of bounds";
+                return this._dataView.getFloat32(this._pos, this.littleEndian);
+            };
+            Byte.prototype.getFloat64 = function () {
+                if (this._pos + 8 > this._length)
+                    throw "getFloat64 error - Out of bounds";
+                return this._dataView.getFloat64(this._pos, this.littleEndian);
             };
             /**
              * 从字节流当前位置读取8位无符号整型值，此方法不会导致位置移动
              */
             Byte.prototype.getUint8 = function () {
-                return this.dataView.getUint8(this.pos);
+                if (this._pos + 1 > this._length)
+                    throw new Error("getUint8 error - Out of bounds");
+                return this._dataView.getUint8(this.pos);
             };
             /**
              * 从字节流当前位置读取16位无符号整型值，此方法不会导致位置移动
              */
             Byte.prototype.getUint16 = function () {
-                return this.dataView.getUint16(this.pos, this.littleEndian);
+                if (this._pos + 2 > this._length)
+                    throw new Error("getUint16 error - Out of bounds");
+                return this._dataView.getUint16(this._pos, this.littleEndian);
             };
             /**
              * 从字节流当前位置读取32位无符号整型值，此方法不会导致位置移动
              */
             Byte.prototype.getUint32 = function () {
-                return this.dataView.getUint32(this.pos, this.littleEndian);
+                return this._dataView.getUint32(this.pos, this.littleEndian);
             };
             /**
              * 从字节流当前位置读取64位无符号整型值，此方法不会导致位置移动
@@ -1067,7 +1257,7 @@ var rigger;
             Byte.prototype.getUint64 = function () {
                 var n1 = this.readUint32();
                 var n2 = this.readUint32();
-                this.pos -= 8;
+                this._pos -= 8;
                 return rigger.utils.Utils.combineInt64([n1, n2]);
             };
             /**
@@ -1075,7 +1265,7 @@ var rigger;
              */
             Byte.prototype.readInt8 = function () {
                 var ret = this.getInt8();
-                this.pos += 1;
+                this._pos += 1;
                 return ret;
             };
             /**
@@ -1083,7 +1273,7 @@ var rigger;
              */
             Byte.prototype.readInt16 = function () {
                 var ret = this.getInt16();
-                this.pos += 2;
+                this._pos += 2;
                 return ret;
             };
             /**
@@ -1091,7 +1281,7 @@ var rigger;
              */
             Byte.prototype.readInt32 = function () {
                 var ret = this.getInt32();
-                this.pos += 4;
+                this._pos += 4;
                 return ret;
             };
             /**
@@ -1099,7 +1289,7 @@ var rigger;
              */
             Byte.prototype.readInt64 = function () {
                 var ret = this.getInt64();
-                this.pos += 8;
+                this._pos += 8;
                 return ret;
             };
             /**
@@ -1107,7 +1297,7 @@ var rigger;
              */
             Byte.prototype.readUint8 = function () {
                 var ret = this.getUint8();
-                this.pos += 1;
+                this._pos += 1;
                 return ret;
             };
             /**
@@ -1115,7 +1305,7 @@ var rigger;
              */
             Byte.prototype.readUint16 = function () {
                 var ret = this.getUint16();
-                this.pos += 2;
+                this._pos += 2;
                 return ret;
             };
             /**
@@ -1123,7 +1313,7 @@ var rigger;
              */
             Byte.prototype.readUint32 = function () {
                 var ret = this.getUint32();
-                this.pos += 4;
+                this._pos += 4;
                 return ret;
             };
             /**
@@ -1131,7 +1321,17 @@ var rigger;
              */
             Byte.prototype.readUint64 = function () {
                 var ret = this.getUint64();
-                this.pos += 8;
+                this._pos += 8;
+                return ret;
+            };
+            Byte.prototype.readFloat32 = function () {
+                var ret = this.getFloat32();
+                this._pos += 4;
+                return ret;
+            };
+            Byte.prototype.readFloat64 = function () {
+                var ret = this.getFloat64();
+                this._pos += 8;
                 return ret;
             };
             /**
@@ -1139,9 +1339,9 @@ var rigger;
              * @param v 写入的值
              */
             Byte.prototype.writeInt8 = function (v) {
-                this.ensureBuffer(1);
-                this.dataView.setInt8(this.pos, v);
-                this.pos += 1;
+                this.ensureWrite(this._pos + 1);
+                this._dataView.setInt8(this.pos, v);
+                this._pos += 1;
                 return this;
             };
             /**
@@ -1149,9 +1349,9 @@ var rigger;
              * @param v 写入的值
              */
             Byte.prototype.writeInt16 = function (v) {
-                this.ensureBuffer(2);
-                this.dataView.setInt16(this.pos, v);
-                this.pos += 2;
+                this.ensureWrite(this._pos + 2);
+                this._dataView.setInt16(this.pos, v, this.littleEndian);
+                this._pos += 2;
                 return this;
             };
             /**
@@ -1159,9 +1359,9 @@ var rigger;
              * @param v 写入的值
              */
             Byte.prototype.writeInt32 = function (v) {
-                this.ensureBuffer(4);
-                this.dataView.setInt32(this.pos, v);
-                this.pos += 4;
+                this.ensureWrite(this._pos + 4);
+                this._dataView.setInt32(this.pos, v, this.littleEndian);
+                this._pos += 4;
                 return this;
             };
             /**
@@ -1169,12 +1369,12 @@ var rigger;
              * @param v 写入的值
              */
             Byte.prototype.writeInt64 = function (v) {
-                this.ensureBuffer(8);
+                this.ensureWrite(this._pos + 8);
                 // 将一个数字拆成2个数字
                 var arr = rigger.utils.Utils.resoleInt64(v);
                 // 将其作为两个32位有符号整型写入
                 this.writeInt32(arr[0]).writeInt32(arr[1]);
-                this.pos += 8;
+                // this._pos += 8;
                 return this;
             };
             /**
@@ -1182,19 +1382,33 @@ var rigger;
              * @param v 写入的值
              */
             Byte.prototype.writeUint8 = function (v) {
-                this.ensureBuffer(1);
-                this.dataView.setUint8(this.pos, v);
-                this.pos += 1;
+                this.ensureWrite(this._pos + 1);
+                this._dataView.setUint8(this.pos, v);
+                this._pos += 1;
                 return this;
+            };
+            Byte.prototype.writeByte = function (value) {
+                this.ensureWrite(this._pos + 1);
+                this._dataView.setInt8(this._pos, value);
+                this._pos += 1;
+                return this;
+            };
+            Byte.prototype.getByte = function () {
+                return this.getInt8();
+            };
+            Byte.prototype.readByte = function () {
+                var ret = this.getByte();
+                this._pos += 1;
+                return ret;
             };
             /**
              * 写入一个16位的无符号值，并且使位置向后移动16位
              * @param v 写入的值
              */
             Byte.prototype.writeUint16 = function (v) {
-                this.ensureBuffer(2);
-                this.dataView.setUint16(this.pos, v);
-                this.pos += 2;
+                this.ensureWrite(this._pos + 2);
+                this._dataView.setUint16(this.pos, v, this.littleEndian);
+                this._pos += 2;
                 return this;
             };
             /**
@@ -1202,9 +1416,9 @@ var rigger;
              * @param v 写入的值
              */
             Byte.prototype.writeUint32 = function (v) {
-                this.ensureBuffer(4);
-                this.dataView.setUint32(this.pos, v);
-                this.pos += 4;
+                this.ensureWrite(this._pos + 4);
+                this._dataView.setUint32(this.pos, v, this.littleEndian);
+                this._pos += 4;
                 return this;
             };
             /**
@@ -1212,25 +1426,75 @@ var rigger;
              * @param v 写入的值
              */
             Byte.prototype.writeUint64 = function (v) {
-                this.ensureBuffer(8);
+                this.ensureWrite(this._pos + 8);
                 // 将一个数字拆成2个数字
                 var arr = rigger.utils.Utils.resoleInt64(v);
                 // 将其作为两个32位无符号整型写入
                 this.writeUint32(arr[0]).writeUint32(arr[1]);
-                this.pos += 8;
+                // this.pos += 8;
                 return this;
             };
             Byte.prototype.writeFloat32 = function (v) {
-                this.ensureBuffer(4);
-                this.dataView.setFloat32(this.pos, v);
-                this.pos += 4;
+                this.ensureWrite(this._pos + 4);
+                this._dataView.setFloat32(this.pos, v, this.littleEndian);
+                this._pos += 4;
                 return this;
             };
             Byte.prototype.writeFloat64 = function (v) {
-                this.ensureBuffer(8);
-                this.dataView.setFloat64(this.pos, v);
-                this.pos += 8;
+                this.ensureWrite(this._pos + 8);
+                this._dataView.setFloat64(this.pos, v, this.littleEndian);
+                this._pos += 8;
                 return this;
+            };
+            Byte.prototype.writeUTFBytes = function (v) {
+                var value = v + "";
+                for (var i = 0, sz = value.length; i < sz; i++) {
+                    var c = value.charCodeAt(i);
+                    if (c <= 0x7F) {
+                        this.writeByte(c);
+                    }
+                    else if (c <= 0x7FF) {
+                        this.ensureWrite(this._pos + 2);
+                        this._u8d.set([0xC0 | (c >> 6), 0x80 | (c & 0x3F)], this._pos);
+                        this._pos += 2;
+                    }
+                    else if (c <= 0xFFFF) {
+                        this.ensureWrite(this._pos + 3);
+                        this._u8d.set([0xE0 | (c >> 12), 0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F)], this._pos);
+                        this._pos += 3;
+                    }
+                    else {
+                        this.ensureWrite(this._pos + 4);
+                        this._u8d.set([0xF0 | (c >> 18), 0x80 | ((c >> 12) & 0x3F), 0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F)], this._pos);
+                        this._pos += 4;
+                    }
+                }
+                return this;
+            };
+            Byte.prototype.writeUTFString = function (value) {
+                var tPos = this.pos;
+                this.writeUint16(1);
+                this.writeUTFBytes(value);
+                var dPos = this.pos - tPos - 2;
+                if (dPos >= 65536) {
+                    throw new Error("writeUTFString byte len more than 65536");
+                }
+                this._dataView.setUint16(tPos, dPos, this.littleEndian);
+                return this;
+            };
+            Byte.prototype.readUTFBytes = function (len) {
+                if (len === void 0) { len = -1; }
+                // (len === void 0) && (len = -1);
+                if (len == 0)
+                    return "";
+                var lastBytes = this.bytesAvailable;
+                if (len > lastBytes)
+                    throw "readUTFBytes error - Out of bounds";
+                len = len > 0 ? len : lastBytes;
+                return this.rUTF(len);
+            };
+            Byte.prototype.readUTFString = function () {
+                return this.readUTFBytes(this.readUint16());
             };
             /**
              * <p>将指定 arraybuffer 对象中的以 offset 为起始偏移量， length 为长度的字节序列写入字节流。</p>
@@ -1243,13 +1507,15 @@ var rigger;
              */
             Byte.prototype.writeArrayBuffer = function (arraybuffer, offset, length) {
                 if (offset === void 0) { offset = 0; }
-                var leftBytes = rigger.utils.Utils.isNullOrUndefined(length) ? arraybuffer.byteLength - offset : length;
-                if (ArrayBuffer.isView(arraybuffer)) {
-                    arraybuffer = arraybuffer.buffer;
-                }
-                this.ensureBuffer(leftBytes);
-                rigger.utils.Utils.copyArrayBuffer(arraybuffer, offset, this.dataView.buffer, this.pos, leftBytes);
-                this.pos += leftBytes;
+                // let leftBytes: number = rigger.utils.Utils.isNullOrUndefined(length) ? arraybuffer.byteLength - offset : length;
+                if (offset < 0 || length < 0)
+                    throw new Error("writeArrayBuffer error - Out of bounds");
+                if (length == 0)
+                    length = arraybuffer.byteLength - offset;
+                this.ensureWrite(this._pos + length);
+                var uint8array = new Uint8Array(arraybuffer);
+                this._u8d.set(uint8array.subarray(offset, offset + length), this._pos);
+                this._pos += length;
                 return this;
             };
             /**
@@ -1267,30 +1533,83 @@ var rigger;
             // 		this.pos = 0;
             // 	}
             // }
-            Byte.prototype.ensureBuffer = function (needByteLen) {
-                if (!this.dataView) {
-                    this.init(needByteLen);
-                }
-                else {
-                    // let pos: number = this.dataView.byteOffset;
-                    var has = this.byteLength - this.pos;
-                    if (has < needByteLen) {
-                        // let temp: DataView = new DataView(new ArrayBuffer(this.byteLength + needByteLen - has));
-                        // 扩展缓冲
-                        this.dataView =
-                            new DataView(rigger.utils.Utils.transferArrayBuffer(this.dataView.buffer, this.byteLength + needByteLen - has));
+            // protected ensureBuffer(needByteLen: number) {
+            //     // let pos: number = this.dataView.byteOffset;
+            //     let has: number = this.byteLength - this.pos;
+            //     if (has < needByteLen) {
+            //         // let temp: DataView = new DataView(new ArrayBuffer(this.byteLength + needByteLen - has));
+            //         // 扩展缓冲
+            //         this.dataView =
+            //             new DataView(
+            //                 rigger.utils.Utils.transferArrayBuffer(this.dataView.buffer, this.byteLength + needByteLen - has)
+            //             );
+            //     }
+            // }
+            Byte.prototype.ensureWrite = function (lengthToEnsure) {
+                if (this._length < lengthToEnsure)
+                    this._length = lengthToEnsure;
+                if (this._allocated < lengthToEnsure)
+                    this.length = lengthToEnsure;
+            };
+            // protected init(byteLenOrBuffer: number | ArrayBuffer): void {
+            //     if (rigger.utils.Utils.isNumber(byteLenOrBuffer)) {
+            //         this.dataView = new DataView(new ArrayBuffer(byteLenOrBuffer));
+            //     }
+            //     else {
+            //         this.dataView = new DataView(byteLenOrBuffer);
+            //     }
+            //     this.pos = 0;
+            // }
+            Byte.prototype.resizeBuffer = function (len) {
+                try {
+                    var newByteView = new Uint8Array(len);
+                    if (this._u8d != null) {
+                        if (this._u8d.length <= len) {
+                            newByteView.set(this._u8d);
+                        }
+                        else {
+                            newByteView.set(this._u8d.subarray(0, len));
+                        }
                     }
+                    this._u8d = newByteView;
+                    this._dataView = new DataView(newByteView.buffer);
+                }
+                catch (err) {
+                    throw "___resizeBuffer err:" + len;
                 }
             };
-            Byte.prototype.init = function (byteLenOrBuffer) {
-                if (rigger.utils.Utils.isNumber(byteLenOrBuffer)) {
-                    this.dataView = new DataView(new ArrayBuffer(byteLenOrBuffer));
+            Byte.prototype.rUTF = function (len) {
+                var v = "", max = this._pos + len, c = 0, c2 = 0, c3 = 0, f = String.fromCharCode;
+                var u = this._u8d, i = 0;
+                while (this._pos < max) {
+                    c = u[this._pos++];
+                    if (c < 0x80) {
+                        if (c != 0) {
+                            v += f(c);
+                        }
+                    }
+                    else if (c < 0xE0) {
+                        v += f(((c & 0x3F) << 6) | (u[this._pos++] & 0x7F));
+                    }
+                    else if (c < 0xF0) {
+                        c2 = u[this._pos++];
+                        v += f(((c & 0x1F) << 12) | ((c2 & 0x7F) << 6) | (u[this._pos++] & 0x7F));
+                    }
+                    else {
+                        c2 = u[this._pos++];
+                        c3 = u[this._pos++];
+                        v += f(((c & 0x0F) << 18) | ((c2 & 0x7F) << 12) | ((c3 << 6) & 0x7F) | (u[this._pos++] & 0x7F));
+                    }
+                    i++;
                 }
-                else {
-                    this.dataView = new DataView(byteLenOrBuffer);
-                }
-                this.pos = 0;
+                return v;
             };
+            Byte.prototype.getBuffer = function () {
+                return this._dataView.buffer;
+            };
+            Byte.BIG_ENDIAN = "bigEndian";
+            Byte.LITTLE_ENDIAN = "littleEndian";
+            Byte.sysEndian = null;
             /**
              * 默认长度
              */
@@ -1789,6 +2108,492 @@ var rigger;
         utils.Utils = Utils;
     })(utils = rigger.utils || (rigger.utils = {}));
 })(rigger || (rigger = {}));
+
+/**
+* 有限状态机类
+*/
+var rigger;
+(function (rigger) {
+    var FSM = /** @class */ (function () {
+        function FSM() {
+            this.mNowStateName = null;
+            this.stateMap = {};
+            this.paramsMap = {};
+            this.triggerMap = {};
+        }
+        Object.defineProperty(FSM.prototype, "nowState", {
+            /**
+             * 状态机的当前状态名
+             */
+            get: function () {
+                return this.mNowStateName;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        FSM.prototype.dispose = function () {
+            for (var k in this.paramsMap) {
+                // (<FSMState>this.paramsMap[k]).dispose();
+                delete this.paramsMap[k];
+            }
+            this.stateMap = null;
+            this.paramsMap = null;
+            this.triggerMap = null;
+        };
+        /**
+         * 启动状态机，一般在设置好所有参数，设置后再调用，只需要调用一次
+         */
+        FSM.prototype.start = function () {
+            this.checkNowState();
+        };
+        /**
+         * 检查当前状态（是否可以迁移当前状态)
+         */
+        FSM.prototype.checkNowState = function () {
+            var state = this.stateMap[this.mNowStateName];
+            if (!state)
+                throw new Error("can not find state in checkNowState:" + this.mNowStateName);
+            var newStateName = state.checkAllTransitions(this);
+            if (newStateName) {
+                this.transitToState(state, this.getState(newStateName));
+            }
+        };
+        /**
+         * 给状态机添加一个状态，添加成功后会返回新添加的状态
+         * 如果原来已经有些STATE了则直接使用已有的
+         * @param stateName
+         */
+        FSM.prototype.addState = function (stateName, ifDefault) {
+            if (ifDefault === void 0) { ifDefault = false; }
+            var state = this.stateMap[stateName];
+            if (!state)
+                state = new rigger.FSMState(stateName);
+            this.stateMap[stateName] = state;
+            if (ifDefault || !this.mNowStateName)
+                this.mNowStateName = stateName;
+            return state;
+        };
+        /**
+         * 根据状态名或状态标识获取状态数据
+         * @param stateName
+         */
+        FSM.prototype.getState = function (stateName) {
+            return this.stateMap[stateName];
+        };
+        /**
+         * 获取参数值
+         * @param params
+         */
+        FSM.prototype.getValue = function (params) {
+            return this.paramsMap[params];
+        };
+        /**
+         * 设置参数值
+         * @param params
+         * @param value
+         * @param ifTrigger 是否是触发器模式 ,此模式下，当参数关联的transition发生后，会将参数值置回原值
+         *
+         */
+        FSM.prototype.setValue = function (params, value, ifTrigger) {
+            if (ifTrigger === void 0) { ifTrigger = false; }
+            if (ifTrigger) {
+                this.triggerMap[params] = { oldValue: this.paramsMap[params] };
+            }
+            this.paramsMap[params] = value;
+            this.onParamsChange(params);
+        };
+        /**
+         * 当参数发生改变时调用
+         * @param params
+         */
+        FSM.prototype.onParamsChange = function (params) {
+            var state = this.stateMap[this.mNowStateName];
+            if (!state)
+                throw new Error("can not find state:" + this.mNowStateName);
+            // 检查当前状态所有的迁移
+            var newStateName = state.onParamsChange(this, params);
+            if (!rigger.utils.Utils.isNullOrUndefined(newStateName)) {
+                this.transitToState(state, this.getState(newStateName));
+            }
+        };
+        /**
+         * 迁移到新状态
+         * @param oldState
+         * @param newState
+         */
+        FSM.prototype.transitToState = function (oldState, newState) {
+            if (!newState)
+                throw new Error("trying to transit to a invalid new state");
+            var oldStateName = oldState.stateName;
+            var newStateName = newState.stateName;
+            // 回复trigger的状态
+            var transition = oldState.getTransition(newStateName);
+            var conditions = transition.conditions;
+            var len = conditions.length;
+            var params;
+            var condition;
+            var trigger;
+            for (var i = 0; i < len; i++) {
+                condition = conditions[i];
+                params = condition.paramsName;
+                trigger = this.triggerMap[params];
+                if (trigger) {
+                    // 如果有trigger信息，则重置参数值,重置后可能再次引起状态迁移
+                    delete this.triggerMap[params];
+                    this.setValue(params, trigger.oldValue);
+                }
+            }
+            // 执行旧状态的leave回调		
+            oldState.executeLeaveAction(newStateName);
+            this.mNowStateName = newStateName;
+            // 执行新状态的enter回调
+            this.getState(newStateName).executeEnterAction(oldStateName);
+            if (oldState.stateName !== newState.stateName) {
+                // 检查当前状态
+                // 判断新旧状态是否相同，防止死循环
+                this.checkNowState();
+            }
+        };
+        return FSM;
+    }());
+    rigger.FSM = FSM;
+})(rigger || (rigger = {}));
+
+/**
+* 有限状态机的状态类
+*/
+var rigger;
+(function (rigger) {
+    /**
+     * 状态机的状态数据
+     */
+    var FSMState = /** @class */ (function () {
+        /**
+         *
+         * @param state 状态名或标示符
+         */
+        function FSMState(state) {
+            this.mParamsStateRelationMap = {};
+            this.mStateName = state;
+            this.transitionsMap = {};
+            this.mParamsStateRelationMap = {};
+        }
+        FSMState.prototype.dispose = function () {
+            this.mStateName = null;
+            this.transitionsMap = null;
+            this.mParamsStateRelationMap = null;
+            this.enterActionManager.dispose();
+            this.leaveActionManager.dispose();
+        };
+        /**
+         * 添加进入此状态时的动作,可以重复调用以增加多个动作
+         * 动作回调时会将旧状态与新状态名附加在传入参数末尾，如：
+         * function onEnter(extraArg..., oldState, newState){}
+         * @param whenEnterCaller
+         * @param whenEnterMethod
+         * @param whenEnterArgs
+         */
+        FSMState.prototype.addEnterAction = function (whenEnterCaller, whenEnterMethod) {
+            var whenEnterArgs = [];
+            for (var _i = 2; _i < arguments.length; _i++) {
+                whenEnterArgs[_i - 2] = arguments[_i];
+            }
+            if (!this.enterActionManager)
+                this.enterActionManager = new rigger.utils.ListenerManager();
+            this.enterActionManager.on(whenEnterCaller, whenEnterMethod, whenEnterArgs);
+            return this;
+        };
+        /**
+         * 添加离开此状态时的动作,可以重复调用以增加多个动作
+         * 动作回调时会将旧状态与新状态名附加在传入参数末尾，如：
+         * function onEnter(extraArg..., oldState, newState){}
+         * @param whenLeaveCaller
+         * @param whenLeaveMethod
+         * @param whenLeaveArgs
+         */
+        FSMState.prototype.addLeaveAction = function (whenLeaveCaller, whenLeaveMethod) {
+            var whenLeaveArgs = [];
+            for (var _i = 2; _i < arguments.length; _i++) {
+                whenLeaveArgs[_i - 2] = arguments[_i];
+            }
+            if (!this.leaveActionManager)
+                this.leaveActionManager = new rigger.utils.ListenerManager();
+            this.leaveActionManager.on(whenLeaveCaller, whenLeaveMethod, whenLeaveArgs);
+            return this;
+        };
+        /**
+         * 执行进入动作
+         * @param oldState
+         * @param newState
+         */
+        FSMState.prototype.executeEnterAction = function (fromState) {
+            if (this.enterActionManager) {
+                this.enterActionManager.execute(fromState, this.stateName);
+            }
+        };
+        /**
+         * 执行离开动作
+         * @param toState
+         */
+        FSMState.prototype.executeLeaveAction = function (toState) {
+            if (this.leaveActionManager) {
+                this.leaveActionManager.execute(this.stateName, toState);
+            }
+        };
+        Object.defineProperty(FSMState.prototype, "paramsStateRelationMap", {
+            /**
+             * 参数状态关系映射
+             */
+            get: function () {
+                return this.mParamsStateRelationMap;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        /**
+         * 增加一个迁移（条件），此接口可以重复对同一个状态调用，以增加多个条件，此时，需要所有条件都满足后，状态才会发生迁移
+         * 返回FSMstate
+         * @param toState 目标状态
+         * @param paramsName 需要检查的参数名
+         * @param checkCaller 检查函数调用者
+         * @param checkMethod 检查函数
+         * @param args 额外参数
+         */
+        FSMState.prototype.addTransition = function (toState, paramsName, checkCaller, checkMethod) {
+            var args = [];
+            for (var _i = 4; _i < arguments.length; _i++) {
+                args[_i - 4] = arguments[_i];
+            }
+            if (rigger.utils.Utils.isNullOrUndefined(toState))
+                return this;
+            if (!rigger.utils.Utils.isNullOrUndefined(paramsName)) {
+                var oldList = this.mParamsStateRelationMap[paramsName];
+                if (!oldList)
+                    oldList = this.mParamsStateRelationMap[paramsName] = [];
+                if (oldList.indexOf(toState) < 0) {
+                    oldList.push(toState);
+                }
+            }
+            var oldTransition = this.getTransition(toState);
+            if (!oldTransition)
+                oldTransition = this.setTransition(toState, new rigger.FSMTransition(toState));
+            oldTransition.addCondition.apply(oldTransition, [paramsName, checkCaller, checkMethod].concat(args));
+            return this;
+        };
+        /**
+         * 当状态机的参数发生了变化时调用，返回新的状态，如果为null,则表示不满足迁移条件
+         * @param fsm
+         * @param paramsName
+         */
+        FSMState.prototype.onParamsChange = function (fsm, paramsName) {
+            // 获取参数相关的目标状态
+            var stateNames = this.mParamsStateRelationMap[paramsName];
+            if (!stateNames || stateNames.length <= 0)
+                return;
+            for (var i = 0; i < stateNames.length; i++) {
+                var stateName = stateNames[i];
+                var transition = this.transitionsMap[stateName];
+                if (transition) {
+                    if (transition.check(fsm)) {
+                        return stateName;
+                    }
+                }
+            }
+            return null;
+        };
+        /**
+         * 检查所有的transition，看是否有可以迁移的状态,并返回新状态，如果没可迁移状态，则返回NULL，
+         * @param fsm
+         */
+        FSMState.prototype.checkAllTransitions = function (fsm) {
+            for (var k in this.transitionsMap) {
+                var transition = this.transitionsMap[k];
+                if (transition) {
+                    if (transition.check(fsm)) {
+                        return k;
+                    }
+                }
+            }
+            return null;
+        };
+        FSMState.prototype.getTransition = function (toState) {
+            return this.transitionsMap[toState];
+        };
+        FSMState.prototype.setTransition = function (toState, transition) {
+            return this.transitionsMap[toState] = transition;
+        };
+        Object.defineProperty(FSMState.prototype, "stateName", {
+            // public getRelatedTransitions(paramsName:string | number):FSMTransition[]{
+            // }
+            /**
+             * 状态名或标识
+             */
+            get: function () {
+                return this.mStateName;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        return FSMState;
+    }());
+    rigger.FSMState = FSMState;
+})(rigger || (rigger = {}));
+
+/**
+* name
+*/
+var rigger;
+(function (rigger) {
+    var FSMTransition = /** @class */ (function () {
+        function FSMTransition(toState) {
+            this.mConditions = [];
+            this.toStateName = toState;
+            this.mConditions = [];
+        }
+        FSMTransition.prototype.dispose = function () {
+            this.toStateName = null;
+            for (var i = 0; i < this.mConditions.length; i++) {
+                var cond = this.mConditions[i];
+                cond.dispose();
+            }
+        };
+        Object.defineProperty(FSMTransition.prototype, "conditions", {
+            /**
+             * 所有的条件
+             */
+            get: function () {
+                return this.mConditions;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        /**
+         * 给迁移添加条件
+         * @param paramsName 参与判断的参数
+         * @param checkCaller 检查函数的调用者
+         * @param checkMethod 检查函数
+         * @param args 额外参数
+         */
+        FSMTransition.prototype.addCondition = function (paramsName, checkCaller, checkMethod) {
+            var args = [];
+            for (var _i = 3; _i < arguments.length; _i++) {
+                args[_i - 3] = arguments[_i];
+            }
+            if (checkMethod && !rigger.utils.Utils.isNullOrUndefined(paramsName)) {
+                var cond = new rigger.FSMTransitionCondition(paramsName, rigger.RiggerHandler.create(checkCaller, checkMethod, args, false));
+                this.mConditions.push(cond);
+            }
+        };
+        FSMTransition.prototype.check = function (fsm) {
+            for (var i = 0; i < this.mConditions.length; i++) {
+                var cond = this.mConditions[i];
+                if (!cond.check(fsm))
+                    return false;
+            }
+            return true;
+        };
+        return FSMTransition;
+    }());
+    rigger.FSMTransition = FSMTransition;
+})(rigger || (rigger = {}));
+
+/**
+* name
+*/
+var rigger;
+(function (rigger) {
+    /**
+     * 迁移条件
+     */
+    var FSMTransitionCondition = /** @class */ (function () {
+        function FSMTransitionCondition(paramsName, handler) {
+            this.paramsName = paramsName;
+            this.checkHandler = handler;
+        }
+        FSMTransitionCondition.prototype.dispose = function () {
+            this.paramsName = null;
+            if (this.checkHandler) {
+                this.checkHandler.recover();
+            }
+        };
+        FSMTransitionCondition.prototype.check = function (fsm) {
+            if (this.checkHandler) {
+                return this.checkHandler.runWith([fsm.getValue(this.paramsName), fsm, this.paramsName]);
+            }
+            return false;
+        };
+        return FSMTransitionCondition;
+    }());
+    rigger.FSMTransitionCondition = FSMTransitionCondition;
+})(rigger || (rigger = {}));
+
+/**
+* 状态机的常用工具函数
+*/
+var rigger;
+(function (rigger) {
+    var FSMUtils = /** @class */ (function () {
+        function FSMUtils() {
+        }
+        /**
+         * 状态机的参数条件判断：相等
+         * @param v
+         */
+        FSMUtils.equal = function (v) {
+            return function (paramsV) {
+                return v === paramsV;
+            };
+        };
+        FSMUtils.notEqual = function (v) {
+            return function (paramsV) {
+                return v !== paramsV;
+            };
+        };
+        /**
+         * 状态机的参数条件判断：参数值小于指定值
+         * @param v
+         */
+        FSMUtils.less = function (v) {
+            return function (paramsV) {
+                return paramsV < v;
+            };
+        };
+        /**
+         * 状态机的参数条件判断：参数值小于等于指定值
+         * @param v
+         */
+        FSMUtils.lessEqual = function (v) {
+            return function (paramsV) {
+                return paramsV <= v;
+            };
+        };
+        /**
+         * 状态机的参数条件判断：参数值大于指定值
+         * @param v
+         */
+        FSMUtils.greater = function (v) {
+            return function (paramsV) {
+                return paramsV > v;
+            };
+        };
+        /**
+         * 状态机的参数条件判断：参数值大于等于指定值
+         * @param v
+         */
+        FSMUtils.greaterEqual = function (v) {
+            return function (paramsV) {
+                return paramsV >= v;
+            };
+        };
+        return FSMUtils;
+    }());
+    rigger.FSMUtils = FSMUtils;
+})(rigger || (rigger = {}));
+
+
+
+
+
 
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -2390,489 +3195,3 @@ var rigger;
         service.PoolService = PoolService;
     })(service = rigger.service || (rigger.service = {}));
 })(rigger || (rigger = {}));
-
-/**
-* 有限状态机类
-*/
-var rigger;
-(function (rigger) {
-    var FSM = /** @class */ (function () {
-        function FSM() {
-            this.mNowStateName = null;
-            this.stateMap = {};
-            this.paramsMap = {};
-            this.triggerMap = {};
-        }
-        Object.defineProperty(FSM.prototype, "nowState", {
-            /**
-             * 状态机的当前状态名
-             */
-            get: function () {
-                return this.mNowStateName;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        FSM.prototype.dispose = function () {
-            for (var k in this.paramsMap) {
-                // (<FSMState>this.paramsMap[k]).dispose();
-                delete this.paramsMap[k];
-            }
-            this.stateMap = null;
-            this.paramsMap = null;
-            this.triggerMap = null;
-        };
-        /**
-         * 启动状态机，一般在设置好所有参数，设置后再调用，只需要调用一次
-         */
-        FSM.prototype.start = function () {
-            this.checkNowState();
-        };
-        /**
-         * 检查当前状态（是否可以迁移当前状态)
-         */
-        FSM.prototype.checkNowState = function () {
-            var state = this.stateMap[this.mNowStateName];
-            if (!state)
-                throw new Error("can not find state in checkNowState:" + this.mNowStateName);
-            var newStateName = state.checkAllTransitions(this);
-            if (newStateName) {
-                this.transitToState(state, this.getState(newStateName));
-            }
-        };
-        /**
-         * 给状态机添加一个状态，添加成功后会返回新添加的状态
-         * 如果原来已经有些STATE了则直接使用已有的
-         * @param stateName
-         */
-        FSM.prototype.addState = function (stateName, ifDefault) {
-            if (ifDefault === void 0) { ifDefault = false; }
-            var state = this.stateMap[stateName];
-            if (!state)
-                state = new rigger.FSMState(stateName);
-            this.stateMap[stateName] = state;
-            if (ifDefault || !this.mNowStateName)
-                this.mNowStateName = stateName;
-            return state;
-        };
-        /**
-         * 根据状态名或状态标识获取状态数据
-         * @param stateName
-         */
-        FSM.prototype.getState = function (stateName) {
-            return this.stateMap[stateName];
-        };
-        /**
-         * 获取参数值
-         * @param params
-         */
-        FSM.prototype.getValue = function (params) {
-            return this.paramsMap[params];
-        };
-        /**
-         * 设置参数值
-         * @param params
-         * @param value
-         * @param ifTrigger 是否是触发器模式 ,此模式下，当参数关联的transition发生后，会将参数值置回原值
-         *
-         */
-        FSM.prototype.setValue = function (params, value, ifTrigger) {
-            if (ifTrigger === void 0) { ifTrigger = false; }
-            if (ifTrigger) {
-                this.triggerMap[params] = { oldValue: this.paramsMap[params] };
-            }
-            this.paramsMap[params] = value;
-            this.onParamsChange(params);
-        };
-        /**
-         * 当参数发生改变时调用
-         * @param params
-         */
-        FSM.prototype.onParamsChange = function (params) {
-            var state = this.stateMap[this.mNowStateName];
-            if (!state)
-                throw new Error("can not find state:" + this.mNowStateName);
-            // 检查当前状态所有的迁移
-            var newStateName = state.onParamsChange(this, params);
-            if (!rigger.utils.Utils.isNullOrUndefined(newStateName)) {
-                this.transitToState(state, this.getState(newStateName));
-            }
-        };
-        /**
-         * 迁移到新状态
-         * @param oldState
-         * @param newState
-         */
-        FSM.prototype.transitToState = function (oldState, newState) {
-            if (!newState)
-                throw new Error("trying to transit to a invalid new state");
-            var oldStateName = oldState.stateName;
-            var newStateName = newState.stateName;
-            // 回复trigger的状态
-            var transition = oldState.getTransition(newStateName);
-            var conditions = transition.conditions;
-            var len = conditions.length;
-            var params;
-            var condition;
-            var trigger;
-            for (var i = 0; i < len; i++) {
-                condition = conditions[i];
-                params = condition.paramsName;
-                trigger = this.triggerMap[params];
-                if (trigger) {
-                    // 如果有trigger信息，则重置参数值,重置后可能再次引起状态迁移
-                    delete this.triggerMap[params];
-                    this.setValue(params, trigger.oldValue);
-                }
-            }
-            // 执行旧状态的leave回调		
-            oldState.executeLeaveAction(newStateName);
-            this.mNowStateName = newStateName;
-            // 执行新状态的enter回调
-            this.getState(newStateName).executeEnterAction(oldStateName);
-            if (oldState.stateName !== newState.stateName) {
-                // 检查当前状态
-                // 判断新旧状态是否相同，防止死循环
-                this.checkNowState();
-            }
-        };
-        return FSM;
-    }());
-    rigger.FSM = FSM;
-})(rigger || (rigger = {}));
-
-/**
-* 有限状态机的状态类
-*/
-var rigger;
-(function (rigger) {
-    /**
-     * 状态机的状态数据
-     */
-    var FSMState = /** @class */ (function () {
-        /**
-         *
-         * @param state 状态名或标示符
-         */
-        function FSMState(state) {
-            this.mParamsStateRelationMap = {};
-            this.mStateName = state;
-            this.transitionsMap = {};
-            this.mParamsStateRelationMap = {};
-        }
-        FSMState.prototype.dispose = function () {
-            this.mStateName = null;
-            this.transitionsMap = null;
-            this.mParamsStateRelationMap = null;
-            this.enterActionManager.dispose();
-            this.leaveActionManager.dispose();
-        };
-        /**
-         * 添加进入此状态时的动作,可以重复调用以增加多个动作
-         * 动作回调时会将旧状态与新状态名附加在传入参数末尾，如：
-         * function onEnter(extraArg..., oldState, newState){}
-         * @param whenEnterCaller
-         * @param whenEnterMethod
-         * @param whenEnterArgs
-         */
-        FSMState.prototype.addEnterAction = function (whenEnterCaller, whenEnterMethod) {
-            var whenEnterArgs = [];
-            for (var _i = 2; _i < arguments.length; _i++) {
-                whenEnterArgs[_i - 2] = arguments[_i];
-            }
-            if (!this.enterActionManager)
-                this.enterActionManager = new rigger.utils.ListenerManager();
-            this.enterActionManager.on(whenEnterCaller, whenEnterMethod, whenEnterArgs);
-            return this;
-        };
-        /**
-         * 添加离开此状态时的动作,可以重复调用以增加多个动作
-         * 动作回调时会将旧状态与新状态名附加在传入参数末尾，如：
-         * function onEnter(extraArg..., oldState, newState){}
-         * @param whenLeaveCaller
-         * @param whenLeaveMethod
-         * @param whenLeaveArgs
-         */
-        FSMState.prototype.addLeaveAction = function (whenLeaveCaller, whenLeaveMethod) {
-            var whenLeaveArgs = [];
-            for (var _i = 2; _i < arguments.length; _i++) {
-                whenLeaveArgs[_i - 2] = arguments[_i];
-            }
-            if (!this.leaveActionManager)
-                this.leaveActionManager = new rigger.utils.ListenerManager();
-            this.leaveActionManager.on(whenLeaveCaller, whenLeaveMethod, whenLeaveArgs);
-            return this;
-        };
-        /**
-         * 执行进入动作
-         * @param oldState
-         * @param newState
-         */
-        FSMState.prototype.executeEnterAction = function (fromState) {
-            if (this.enterActionManager) {
-                this.enterActionManager.execute(fromState, this.stateName);
-            }
-        };
-        /**
-         * 执行离开动作
-         * @param toState
-         */
-        FSMState.prototype.executeLeaveAction = function (toState) {
-            if (this.leaveActionManager) {
-                this.leaveActionManager.execute(this.stateName, toState);
-            }
-        };
-        Object.defineProperty(FSMState.prototype, "paramsStateRelationMap", {
-            /**
-             * 参数状态关系映射
-             */
-            get: function () {
-                return this.mParamsStateRelationMap;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        /**
-         * 增加一个迁移（条件），此接口可以重复对同一个状态调用，以增加多个条件，此时，需要所有条件都满足后，状态才会发生迁移
-         * 返回FSMstate
-         * @param toState 目标状态
-         * @param paramsName 需要检查的参数名
-         * @param checkCaller 检查函数调用者
-         * @param checkMethod 检查函数
-         * @param args 额外参数
-         */
-        FSMState.prototype.addTransition = function (toState, paramsName, checkCaller, checkMethod) {
-            var args = [];
-            for (var _i = 4; _i < arguments.length; _i++) {
-                args[_i - 4] = arguments[_i];
-            }
-            if (rigger.utils.Utils.isNullOrUndefined(toState))
-                return this;
-            if (!rigger.utils.Utils.isNullOrUndefined(paramsName)) {
-                var oldList = this.mParamsStateRelationMap[paramsName];
-                if (!oldList)
-                    oldList = this.mParamsStateRelationMap[paramsName] = [];
-                if (oldList.indexOf(toState) < 0) {
-                    oldList.push(toState);
-                }
-            }
-            var oldTransition = this.getTransition(toState);
-            if (!oldTransition)
-                oldTransition = this.setTransition(toState, new rigger.FSMTransition(toState));
-            oldTransition.addCondition.apply(oldTransition, [paramsName, checkCaller, checkMethod].concat(args));
-            return this;
-        };
-        /**
-         * 当状态机的参数发生了变化时调用，返回新的状态，如果为null,则表示不满足迁移条件
-         * @param fsm
-         * @param paramsName
-         */
-        FSMState.prototype.onParamsChange = function (fsm, paramsName) {
-            // 获取参数相关的目标状态
-            var stateNames = this.mParamsStateRelationMap[paramsName];
-            if (!stateNames || stateNames.length <= 0)
-                return;
-            for (var i = 0; i < stateNames.length; i++) {
-                var stateName = stateNames[i];
-                var transition = this.transitionsMap[stateName];
-                if (transition) {
-                    if (transition.check(fsm)) {
-                        return stateName;
-                    }
-                }
-            }
-            return null;
-        };
-        /**
-         * 检查所有的transition，看是否有可以迁移的状态,并返回新状态，如果没可迁移状态，则返回NULL，
-         * @param fsm
-         */
-        FSMState.prototype.checkAllTransitions = function (fsm) {
-            for (var k in this.transitionsMap) {
-                var transition = this.transitionsMap[k];
-                if (transition) {
-                    if (transition.check(fsm)) {
-                        return k;
-                    }
-                }
-            }
-            return null;
-        };
-        FSMState.prototype.getTransition = function (toState) {
-            return this.transitionsMap[toState];
-        };
-        FSMState.prototype.setTransition = function (toState, transition) {
-            return this.transitionsMap[toState] = transition;
-        };
-        Object.defineProperty(FSMState.prototype, "stateName", {
-            // public getRelatedTransitions(paramsName:string | number):FSMTransition[]{
-            // }
-            /**
-             * 状态名或标识
-             */
-            get: function () {
-                return this.mStateName;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        return FSMState;
-    }());
-    rigger.FSMState = FSMState;
-})(rigger || (rigger = {}));
-
-/**
-* name
-*/
-var rigger;
-(function (rigger) {
-    var FSMTransition = /** @class */ (function () {
-        function FSMTransition(toState) {
-            this.mConditions = [];
-            this.toStateName = toState;
-            this.mConditions = [];
-        }
-        FSMTransition.prototype.dispose = function () {
-            this.toStateName = null;
-            for (var i = 0; i < this.mConditions.length; i++) {
-                var cond = this.mConditions[i];
-                cond.dispose();
-            }
-        };
-        Object.defineProperty(FSMTransition.prototype, "conditions", {
-            /**
-             * 所有的条件
-             */
-            get: function () {
-                return this.mConditions;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        /**
-         * 给迁移添加条件
-         * @param paramsName 参与判断的参数
-         * @param checkCaller 检查函数的调用者
-         * @param checkMethod 检查函数
-         * @param args 额外参数
-         */
-        FSMTransition.prototype.addCondition = function (paramsName, checkCaller, checkMethod) {
-            var args = [];
-            for (var _i = 3; _i < arguments.length; _i++) {
-                args[_i - 3] = arguments[_i];
-            }
-            if (checkMethod && !rigger.utils.Utils.isNullOrUndefined(paramsName)) {
-                var cond = new rigger.FSMTransitionCondition(paramsName, rigger.RiggerHandler.create(checkCaller, checkMethod, args, false));
-                this.mConditions.push(cond);
-            }
-        };
-        FSMTransition.prototype.check = function (fsm) {
-            for (var i = 0; i < this.mConditions.length; i++) {
-                var cond = this.mConditions[i];
-                if (!cond.check(fsm))
-                    return false;
-            }
-            return true;
-        };
-        return FSMTransition;
-    }());
-    rigger.FSMTransition = FSMTransition;
-})(rigger || (rigger = {}));
-
-/**
-* name
-*/
-var rigger;
-(function (rigger) {
-    /**
-     * 迁移条件
-     */
-    var FSMTransitionCondition = /** @class */ (function () {
-        function FSMTransitionCondition(paramsName, handler) {
-            this.paramsName = paramsName;
-            this.checkHandler = handler;
-        }
-        FSMTransitionCondition.prototype.dispose = function () {
-            this.paramsName = null;
-            if (this.checkHandler) {
-                this.checkHandler.recover();
-            }
-        };
-        FSMTransitionCondition.prototype.check = function (fsm) {
-            if (this.checkHandler) {
-                return this.checkHandler.runWith([fsm.getValue(this.paramsName), fsm, this.paramsName]);
-            }
-            return false;
-        };
-        return FSMTransitionCondition;
-    }());
-    rigger.FSMTransitionCondition = FSMTransitionCondition;
-})(rigger || (rigger = {}));
-
-/**
-* 状态机的常用工具函数
-*/
-var rigger;
-(function (rigger) {
-    var FSMUtils = /** @class */ (function () {
-        function FSMUtils() {
-        }
-        /**
-         * 状态机的参数条件判断：相等
-         * @param v
-         */
-        FSMUtils.equal = function (v) {
-            return function (paramsV) {
-                return v === paramsV;
-            };
-        };
-        FSMUtils.notEqual = function (v) {
-            return function (paramsV) {
-                return v !== paramsV;
-            };
-        };
-        /**
-         * 状态机的参数条件判断：参数值小于指定值
-         * @param v
-         */
-        FSMUtils.less = function (v) {
-            return function (paramsV) {
-                return paramsV < v;
-            };
-        };
-        /**
-         * 状态机的参数条件判断：参数值小于等于指定值
-         * @param v
-         */
-        FSMUtils.lessEqual = function (v) {
-            return function (paramsV) {
-                return paramsV <= v;
-            };
-        };
-        /**
-         * 状态机的参数条件判断：参数值大于指定值
-         * @param v
-         */
-        FSMUtils.greater = function (v) {
-            return function (paramsV) {
-                return paramsV > v;
-            };
-        };
-        /**
-         * 状态机的参数条件判断：参数值大于等于指定值
-         * @param v
-         */
-        FSMUtils.greaterEqual = function (v) {
-            return function (paramsV) {
-                return paramsV >= v;
-            };
-        };
-        return FSMUtils;
-    }());
-    rigger.FSMUtils = FSMUtils;
-})(rigger || (rigger = {}));
-
-
-
-
-
