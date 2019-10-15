@@ -1,10 +1,7 @@
-var ts = require("gulp-typescript"); // 需要安装包
 var gulp = require("gulp");
-var sorter = require("gulp-typescript-sort");
 var concat = require('gulp-concat'); // 需要安装包
 var rename = require("gulp-rename");
 var fs = require('fs');
-var merge = require("merge-stream");
 var through = require("through2")
 
 var Rigger = require('./rigger.js');
@@ -135,12 +132,6 @@ var RiggerBuildUtils = {
     buildKernelServiceConfigFiles: function () {
         var ksRoot = Rigger.kernelServiceRoot;
         if (fs.existsSync(ksRoot)) {
-            // var dirs = fs.readdirSync(ksRoot);
-            // for (var i = 0; i < dirs.length; ++i) {
-            //     var dir = dirs[i];
-            //     // console.log("config dir:" + Rigger.makeThirdServiceConfigPath(dir));
-            //     gulp.src(Rigger.makeKennelServiceConfigPath(dir)).pipe(gulp.dest(`${Rigger.applicationConfig.binRoot}/rigger/riggerConfigs/serviceConfigs`));
-            // }
             var serviceBuildPath = RiggerBuildUtils.makeServiceConfigBuildPath();
             gulp.src(`${Rigger.makeKernelConfigPath("rigger.service.EventService")}/*.json`)
                 .pipe(through.obj(function (file, encode, cb) {

@@ -273,8 +273,11 @@ var RiggerPublishUtils = {
         var depServiceStream = gulp.src("./rigger/thirdServices/**/*.ts");
         var depPackagesStream = gulp.src("./rigger/thirdPackages/**/*.ts");
 
-        var libStream = gulp.src(appConfig.libPathes);
-        return merge(libStream, riggerStream, depServiceStream, depPackagesStream);
+        if(appConfig.libPathes && appConfig.libPathes.length > 0){
+            var libStream = gulp.src(appConfig.libPathes);
+            return merge(libStream, riggerStream, depServiceStream, depPackagesStream);
+        }
+        return merge(riggerStream, depServiceStream, depPackagesStream);        
     }
 }
 
