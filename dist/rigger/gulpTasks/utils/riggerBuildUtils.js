@@ -6,6 +6,7 @@ var through = require("through2")
 
 var Rigger = require('./rigger.js');
 var RiggerUtils = require('./riggerUtils.js')
+var uglyfi = require("gulp-uglify");
 
 var RiggerBuildUtils = {
     reConfig: function () {
@@ -203,7 +204,7 @@ var RiggerBuildUtils = {
         src.push(`./rigger/thirdPlugins/**/bin/*.js`);
         RiggerBuildUtils.collectPackagesSrc(src);
         // var pluginsBin = gulp.src(`./rigger/thirdPlugins/**/*.js`);
-        return gulp.src(src).pipe(concat("rigger.min.js")).pipe(gulp.dest(`${binRoot}/rigger`));
+        return gulp.src(src).pipe(uglyfi()).pipe(concat("rigger.min.js")).pipe(gulp.dest(`${binRoot}/rigger`));
         // .pipe(gulp.dest(`${binRoot}/rigger`));
     },
 

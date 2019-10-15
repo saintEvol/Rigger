@@ -5,7 +5,8 @@ var concat = require('gulp-concat'); // 需要安装包
 var rename = require("gulp-rename");
 var merge = require("merge-stream");
 var fs = require('fs');
-var filter = require("gulp-filter");
+// var filter = require("gulp-filter");
+var uglify = require('gulp-uglify'); // 需要安装包
 
 var Rigger = require('./rigger.js');
 var RiggerUtils = require('./riggerUtils.js')
@@ -57,7 +58,7 @@ var RiggerPublishUtils = {
         // let riggerStream = gulp.src(["./rigger/kernel/**/*.ts", "./rigger/thirdServices/**/*.ts"]);
         let commonStream = RiggerPublishUtils.collectCommonStream();
 
-        var servicePath;
+        // var servicePath;
         for (var index = 0; index < dirs.length; index++) {
             var dir = dirs[index];
             // console.log(`dir:${dir}`);
@@ -126,6 +127,7 @@ var RiggerPublishUtils = {
         var outRoot = Rigger.applicationConfig.outRoot;
         // console.log(`out root:${outRoot}, path:${serviceRoot}/**/*.ts`);
         tsResult.dts.pipe(gulp.dest(`${outRoot}/thirdServices/${serviceName}/dts`));
+        tsResult.js.pipe(concat(`${serviceName}.min.js`)).pipe(uglify()).pipe(gulp.dest(`${outRoot}/thirdServices/${serviceName}/bin`));
         tsResult.js.pipe(concat(`${serviceName}.min.js`)).pipe(gulp.dest(`${outRoot}/thirdServices/${serviceName}/bin`));
         // 发布配置
         gulp.src(`${serviceRoot}/config/*.json`).pipe(gulp.dest(`${outRoot}/thirdServices/${serviceName}`));
