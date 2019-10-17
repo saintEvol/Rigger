@@ -28,7 +28,8 @@ var RiggerUtils = {
             experimentalDecorators: true,
             lib: ["dom", "es2015"],
             emitDecoratorMetadata: true,
-            declaration: true
+            declaration: true,
+            skipLibCheck: true
         });
     },
 
